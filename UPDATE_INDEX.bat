@@ -10,12 +10,15 @@ echo.
 REM You can pass raw URL as argument:
 REM UPDATE_INDEX.bat https://raw.githubusercontent.com/USERNAME/REPO/main/index.html
 set "RAW_URL=%~1"
-if "%RAW_URL%"=="" set "RAW_URL=https://raw.githubusercontent.com/USERNAME/REPO/main/index.html"
+if "%RAW_URL%"=="" set "RAW_URL=https://github.com/vsh2607/simple-asset-management/blob/main/index.html"
+set "DL_URL=%RAW_URL%"
+set "DL_URL=%DL_URL:https://github.com/=https://raw.githubusercontent.com/%"
+set "DL_URL=%DL_URL:/blob/=/%"
 
 set "BASE_DIR=%~dp0"
 set "TARGET=%BASE_DIR%index.html"
 set "BACKUP=%BASE_DIR%index.backup.html"
-set "TMP=%BASE_DIR%index.new.html"
+set "TMP=%TEMP%\index.new.%RANDOM%%RANDOM%.html"
 
 if not exist "%TARGET%" (
   echo [ERROR] index.html tidak ditemukan di folder ini.
@@ -25,6 +28,8 @@ if not exist "%TARGET%" (
 
 echo URL sumber:
 echo %RAW_URL%
+echo URL download:
+echo %DL_URL%
 echo.
 
 copy /Y "%TARGET%" "%BACKUP%" >nul
@@ -35,12 +40,23 @@ if errorlevel 1 (
 )
 
 echo Mengunduh versi terbaru index.html...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ErrorActionPreference='Stop';" ^
-  "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;" ^
-  "Invoke-WebRequest -Uri '%RAW_URL%' -OutFile '%TMP%'"
+set "DL_OK=0"
 
-if errorlevel 1 (
+where curl.exe >nul 2>&1
+if not errorlevel 1 (
+  curl.exe -L --fail --silent --show-error "%DL_URL%" -o "%TMP%"
+  if not errorlevel 1 set "DL_OK=1"
+)
+
+if "%DL_OK%"=="0" (
+  powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "$ErrorActionPreference='Stop';" ^
+    "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;" ^
+    "Invoke-WebRequest -Uri '%DL_URL%' -OutFile '%TMP%'"
+  if not errorlevel 1 set "DL_OK=1"
+)
+
+if "%DL_OK%"=="0" (
   echo [ERROR] Gagal download file dari GitHub.
   echo Restore dari backup...
   copy /Y "%BACKUP%" "%TARGET%" >nul
@@ -60,7 +76,7 @@ if !NEW_SIZE! LSS 1000 (
   exit /b 1
 )
 
-move /Y "%TMP%" "%TARGET%" >nul
+copy /Y "%TMP%" "%TARGET%" >nul
 if errorlevel 1 (
   echo [ERROR] Gagal mengganti index.html
   echo Restore dari backup...
@@ -69,10 +85,10 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+if exist "%TMP%" del /f /q "%TMP%" >nul 2>&1
 
 echo [OK] index.html berhasil diperbarui.
 echo data.json TIDAK diubah.
 echo Backup tersimpan di: index.backup.html
 echo.
 pause
-
