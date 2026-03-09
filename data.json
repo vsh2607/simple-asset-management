@@ -1,0 +1,234 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "password": "admin123",
+      "fullname": "Administrator",
+      "role": "Viewer"
+    },
+    {
+      "id": 1773030352480,
+      "username": "titus",
+      "password": "12345678",
+      "fullname": "Titus Pranoto Wibowo",
+      "role": "Administrator"
+    }
+  ],
+  "locations": [
+    {
+      "id": 1,
+      "code": "LOC-001",
+      "name": "Ruang Rehabilitasi",
+      "desc": ""
+    },
+    {
+      "id": 2,
+      "code": "LOC-002",
+      "name": "Ruang Kepala",
+      "desc": ""
+    },
+    {
+      "id": 3,
+      "code": "LOC-003",
+      "name": "Ruang Tengah",
+      "desc": ""
+    },
+    {
+      "id": 4,
+      "code": "LOC-004",
+      "name": "Ruang Keuangan",
+      "desc": ""
+    },
+    {
+      "id": 5,
+      "code": "LOC-005",
+      "name": "Ruang Rapat",
+      "desc": ""
+    },
+    {
+      "id": 6,
+      "code": "LOC-006",
+      "name": "Ruang Brantas",
+      "desc": ""
+    },
+    {
+      "id": 7,
+      "code": "LOC-007",
+      "name": "Ruang Loby",
+      "desc": ""
+    },
+    {
+      "id": 8,
+      "code": "LOC-008",
+      "name": "Ruang Satpam",
+      "desc": ""
+    },
+    {
+      "id": 9,
+      "code": "LOC-009",
+      "name": "Ruang Klinik",
+      "desc": ""
+    },
+    {
+      "id": 10,
+      "code": "LOC-010",
+      "name": "Ruang Garasi Mobil",
+      "desc": ""
+    },
+    {
+      "id": 11,
+      "code": "LOC-011",
+      "name": "Ruang Garasi Motor",
+      "desc": ""
+    },
+    {
+      "id": 12,
+      "code": "LOC-012",
+      "name": "Dapur",
+      "desc": ""
+    },
+    {
+      "id": 13,
+      "code": "LOC-013",
+      "name": "Ruang P2M",
+      "desc": ""
+    },
+    {
+      "id": 14,
+      "code": "LOC-014",
+      "name": "Ruang Arsip",
+      "desc": ""
+    },
+    {
+      "id": 15,
+      "code": "LOC-015",
+      "name": "Ruang Gudang",
+      "desc": ""
+    }
+  ],
+  "types": [
+    {
+      "id": 1,
+      "code": "ELK",
+      "name": "Elektronik",
+      "desc": "Komputer, laptop, printer, proyektor, scanner, dsb."
+    },
+    {
+      "id": 2,
+      "code": "FRN",
+      "name": "Furnitur",
+      "desc": "Meja, kursi, lemari, rak, sofa, dsb."
+    },
+    {
+      "id": 3,
+      "code": "KDR",
+      "name": "Kendaraan",
+      "desc": "Mobil, motor, dan kendaraan operasional lainnya"
+    },
+    {
+      "id": 4,
+      "code": "AMS",
+      "name": "Alat Medis & Kesehatan",
+      "desc": "Tensimeter, timbangan, alat terapi, P3K, dsb."
+    },
+    {
+      "id": 5,
+      "code": "KMN",
+      "name": "Komunikasi & Jaringan",
+      "desc": "Telepon, HT, access point, switch, CCTV, dsb."
+    },
+    {
+      "id": 6,
+      "code": "ATK",
+      "name": "Alat Tulis Kantor",
+      "desc": "Peralatan kantor habis pakai dan non-habis pakai"
+    },
+    {
+      "id": 7,
+      "code": "RMT",
+      "name": "Peralatan Rumah Tangga",
+      "desc": "AC, kipas, kulkas, dispenser, TV, dsb."
+    },
+    {
+      "id": 8,
+      "code": "SFT",
+      "name": "Perangkat Lunak",
+      "desc": "Lisensi software, aplikasi, dan sistem operasi"
+    },
+    {
+      "id": 9,
+      "code": "KMN",
+      "name": "Keamanan & K3",
+      "desc": "CCTV, alarm, APAR, tabung pemadam, dsb."
+    },
+    {
+      "id": 10,
+      "code": "INF",
+      "name": "Infrastruktur",
+      "desc": "Genset, panel listrik, UPS, instalasi jaringan"
+    },
+    {
+      "id": 11,
+      "code": "ARS",
+      "name": "Peralatan Arsip",
+      "desc": "Rak arsip, filing cabinet, mesin shredder, dsb."
+    },
+    {
+      "id": 12,
+      "code": "DAP",
+      "name": "Peralatan Dapur",
+      "desc": "Kompor, peralatan masak, kulkas dapur, dispenser"
+    },
+    {
+      "id": 13,
+      "code": "KLN",
+      "name": "Kebersihan & Sanitasi",
+      "desc": "Vacuum cleaner, alat kebersihan, tempat sampah"
+    },
+    {
+      "id": 14,
+      "code": "OLR",
+      "name": "Rehabilitasi & Olahraga",
+      "desc": "Alat terapi fisik, alat olahraga, matras, parallel bar"
+    },
+    {
+      "id": 15,
+      "code": "TND",
+      "name": "Tanda & Papan Informasi",
+      "desc": "Papan nama, banner, papan pengumuman, rambu"
+    }
+  ],
+  "sources": [
+    {
+      "id": 1,
+      "code": "BMD",
+      "name": "Barang Milik Daerah",
+      "desc": "Sumber daerah"
+    },
+    {
+      "id": 2,
+      "code": "BMN",
+      "name": "Barang Milik Negara",
+      "desc": "Sumber negara"
+    }
+  ],
+  "assets": [
+    {
+      "id": 1773030629009,
+      "code": "ASSET-001",
+      "name": "Testing",
+      "merk": "Testing",
+      "serial": "test-001",
+      "typeId": 1,
+      "locId": 1,
+      "sourceId": 1,
+      "jumlah": 1,
+      "satuan": "Unit",
+      "status": "Pemeliharaan",
+      "date": "2026-03-09",
+      "value": 2560000,
+      "notes": "Halo"
+    }
+  ]
+}

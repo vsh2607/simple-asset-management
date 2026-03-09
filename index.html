@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manajemen Asset BNNK Sleman</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+  :root {
+    --bg:#0f1117; --surface:#181c27; --surface2:#1e2333; --border:#2a3147;
+    --accent:#4f8ef7; --accent2:#38d9a9; --danger:#f76c6c; --warn:#f5a623;
+    --text:#e8ecf4; --text2:#8a93b0; --sidebar-w:240px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  /* LOADING */
+  #loading-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px}
+  .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-txt{font-size:14px;color:var(--text2)}
+  /* LOGIN */
+  #login-screen{display:none;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 60% 40%,#1a2340 0%,#0f1117 70%)}
+  .login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:48px 44px;width:380px;box-shadow:0 32px 80px rgba(0,0,0,.6)}
+  .login-logo{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:8px}
+  .login-title{font-size:26px;font-weight:700;margin-bottom:6px}
+  .login-sub{font-size:13px;color:var(--text2);margin-bottom:36px}
+  .login-err{color:var(--danger);font-size:13px;margin-top:10px;text-align:center;display:none}
+  .login-hint{font-size:11px;color:var(--text2);margin-top:20px;text-align:center}
+  .btn-login{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;transition:opacity .2s}
+  .btn-login:hover{opacity:.88}
+  /* FORM */
+  .form-group{margin-bottom:14px}
+  .form-group label{display:block;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text2);margin-bottom:7px}
+  .form-group input,.form-group select,.form-group textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 13px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .2s}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent)}
+  .form-group select option{background:var(--surface2)}
+  .form-group textarea{resize:vertical;min-height:70px}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  /* APP */
+  #app{display:none;flex-direction:row;min-height:100vh}
+  /* SIDEBAR */
+  #sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100}
+  .sidebar-header{padding:22px 20px 16px;border-bottom:1px solid var(--border)}
+  .sidebar-logo{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2.5px;color:var(--accent);text-transform:uppercase}
+  .sidebar-appname{font-size:16px;font-weight:700;margin-top:4px}
+  .sidebar-nav{flex:1;overflow-y:auto;padding:12px 0}
+  .nav-section{padding:12px 20px 4px;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text2)}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;font-size:13.5px;font-weight:500;cursor:pointer;color:var(--text2);transition:all .15s;border-left:3px solid transparent}
+  .nav-item:hover{background:var(--surface2);color:var(--text)}
+  .nav-item.active{background:rgba(79,142,247,.1);color:var(--accent);border-left-color:var(--accent)}
+  .nav-item .icon{font-size:16px;width:20px;text-align:center}
+  .sidebar-footer{padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+  .user-avatar{width:32px;height:32px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+  .user-info{flex:1}
+  .user-name{font-size:13px;font-weight:600}
+  .user-role{font-size:11px;color:var(--text2)}
+  .btn-logout{background:none;border:none;color:var(--text2);cursor:pointer;font-size:18px}
+  .btn-logout:hover{color:var(--danger)}
+  /* MAIN */
+  #main{margin-left:var(--sidebar-w);flex:1;padding:32px;min-height:100vh}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px}
+  .page-title{font-size:22px;font-weight:700}
+  .page-sub{font-size:13px;color:var(--text2);margin-top:2px}
+  /* STATS */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;overflow:hidden}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+  .stat-card.blue::before{background:var(--accent)}
+  .stat-card.green::before{background:var(--accent2)}
+  .stat-card.orange::before{background:var(--warn)}
+  .stat-card.red::before{background:var(--danger)}
+  .stat-label{font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-bottom:10px}
+  .stat-val{font-size:32px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+  .stat-icon{position:absolute;right:18px;top:18px;font-size:24px;opacity:.25}
+  /* CARD */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:24px}
+  .card-header{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .card-title{font-size:15px;font-weight:700}
+  .card-title-sub{font-size:11px;color:var(--text2);font-weight:500}
+  .card-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .input-search{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:7px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;width:200px;transition:border-color .2s}
+  .input-search:focus{border-color:var(--accent)}
+  .tbl-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{background:var(--surface2);padding:11px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);white-space:nowrap}
+  tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+  tbody tr:hover{background:var(--surface2)}
+  tbody td{padding:10px 14px;vertical-align:middle}
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+  .badge-active{background:rgba(56,217,169,.15);color:var(--accent2)}
+  .badge-inactive{background:rgba(247,108,108,.15);color:var(--danger)}
+  .badge-maintenance{background:rgba(245,166,35,.15);color:var(--warn)}
+  /* BUTTONS */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:opacity .2s;white-space:nowrap;font-family:inherit}
+  .btn:hover{opacity:.85}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-success{background:var(--accent2);color:#0f1117}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2)}
+  .btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-sm{padding:5px 10px;font-size:12px}
+  /* SAVE */
+  #save-indicator{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 16px;font-size:12px;color:var(--text2);opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999}
+  #save-indicator.show{opacity:1}
+  #save-indicator.ok{color:var(--accent2);border-color:var(--accent2)}
+  #save-indicator.err{color:var(--danger);border-color:var(--danger)}
+  /* MODAL */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:999;align-items:center;justify-content:center;padding:20px}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:32px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 40px 100px rgba(0,0,0,.7)}
+  .modal-title{font-size:18px;font-weight:700;margin-bottom:24px}
+  .modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}
+  .empty-state{text-align:center;padding:48px 20px;color:var(--text2)}
+  .empty-state .icon{font-size:40px;margin-bottom:12px}
+  .data-notice{background:rgba(56,217,169,.07);border:1px solid rgba(56,217,169,.2);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--accent2);margin-bottom:20px}
+  .insight-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:24px}
+  .insight-table th{font-size:10px;padding:9px 10px}
+  .insight-table td{padding:8px 10px;font-size:12px}
+  .insight-name{font-weight:600}
+  .insight-num{font-family:'IBM Plex Mono',monospace;text-align:right;white-space:nowrap}
+  .insight-bar{min-width:120px}
+  .bar-track{height:7px;background:var(--border);border-radius:99px;overflow:hidden}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .bar-txt{font-size:10px;color:var(--text2);margin-top:3px;text-align:right}
+  @media (max-width:1200px){
+    .insight-grid{grid-template-columns:1fr}
+  }
+  ::-webkit-scrollbar{width:6px}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-txt">Menghubungkan ke server lokal...</div>
+</div>
+
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">◈ Manajemen Asset BNNK Sleman</div>
+    <div class="login-title">Selamat Datang</div>
+    <div class="login-sub">Masuk untuk mengelola aset</div>
+    <div class="form-group"><label>Username</label><input type="text" id="login-user" value="admin"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <button class="btn-login" onclick="doLogin()">Masuk →</button>
+    <div class="login-err" id="login-err">❌ Username atau password salah</div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">◈ BNNK Sleman</div>
+      <div class="sidebar-appname">Manajemen Asset</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Utama</div>
+      <div class="nav-item active" onclick="showPage('dashboard')"><span class="icon">📊</span> Dashboard</div>
+      <div class="nav-section">Master Data</div>
+      <div class="nav-item" onclick="showPage('locations')"><span class="icon">📍</span> Master Lokasi</div>
+      <div class="nav-item" onclick="showPage('types')"><span class="icon">🏷️</span> Master Tipe Aset</div>
+      <div class="nav-item" onclick="showPage('sources')"><span class="icon">🏛️</span> Master Sumber Asset</div>
+      <div class="nav-section">Aset</div>
+      <div class="nav-item" onclick="showPage('assets')"><span class="icon">📦</span> Daftar Asset</div>
+      <div class="nav-section">Pengaturan</div>
+      <div class="nav-item" onclick="showPage('users')"><span class="icon">👤</span> Pengguna</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-avatar" id="user-avatar">A</div>
+      <div class="user-info">
+        <div class="user-name" id="user-display">Admin</div>
+        <div class="user-role" id="user-role-display">Administrator</div>
+      </div>
+      <button class="btn-logout" onclick="doLogout()" title="Keluar">⏻</button>
+    </div>
+  </div>
+
+  <div id="main">
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page">
+      <div class="topbar">
+        <div><div class="page-title">Dashboard</div><div class="page-sub">Ringkasan seluruh aset</div></div>
+      </div>
+      <div class="data-notice">✅ Data tersimpan otomatis ke <b>data.json</b> di folder yang sama. Salin seluruh folder untuk memindahkan ke komputer lain.</div>
+      <div class="stats-grid">
+        <div class="stat-card blue"><div class="stat-label">Total Data Aset</div><div class="stat-val" id="stat-total">0</div><div class="stat-icon">📦</div></div>
+        <div class="stat-card green"><div class="stat-label">Total Unit Barang</div><div class="stat-val" id="stat-unit">0</div><div class="stat-icon">🧮</div></div>
+        <div class="stat-card green"><div class="stat-label">Aktif</div><div class="stat-val" id="stat-active">0</div><div class="stat-icon">✅</div></div>
+        <div class="stat-card orange"><div class="stat-label">Pemeliharaan</div><div class="stat-val" id="stat-maint">0</div><div class="stat-icon">🔧</div></div>
+        <div class="stat-card red"><div class="stat-label">Tidak Aktif</div><div class="stat-val" id="stat-inactive">0</div><div class="stat-icon">❌</div></div>
+      </div>
+      <div class="insight-grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Aset Per Lokasi</div>
+            <div class="card-title-sub">Berdasarkan total unit barang</div>
+          </div>
+          <div class="tbl-wrap">
+            <table class="insight-table">
+              <thead><tr><th>Lokasi</th><th>Aset</th><th>Unit</th><th>Porsi</th></tr></thead>
+              <tbody id="dash-loc-summary"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Aset Per Tipe</div>
+            <div class="card-title-sub">Berdasarkan total unit barang</div>
+          </div>
+          <div class="tbl-wrap">
+            <table class="insight-table">
+              <thead><tr><th>Tipe</th><th>Aset</th><th>Unit</th><th>Porsi</th></tr></thead>
+              <tbody id="dash-type-summary"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Aset Per Sumber</div>
+            <div class="card-title-sub">BMD/BMN dan sumber lainnya</div>
+          </div>
+          <div class="tbl-wrap">
+            <table class="insight-table">
+              <thead><tr><th>Sumber</th><th>Aset</th><th>Unit</th><th>Porsi</th></tr></thead>
+              <tbody id="dash-source-summary"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Aset Terbaru Ditambahkan</div></div>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>Kode</th><th>Nama Aset</th><th>Merk</th><th>Tipe</th><th>Lokasi</th><th>Sumber</th><th>Jumlah</th><th>Status</th></tr></thead>
+          <tbody id="dash-recent"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOKASI -->
+    <div id="page-locations" class="page" style="display:none">
+      <div class="topbar">
+        <div><div class="page-title">Master Lokasi</div><div class="page-sub">Kelola data lokasi penempatan aset</div></div>
+        <button class="btn btn-primary" onclick="openModal('location')">+ Tambah Lokasi</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Semua Lokasi</div>
+          <input class="input-search" placeholder="🔍 Cari lokasi..." oninput="renderLocations(this.value)">
+        </div>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>#</th><th>Kode</th><th>Nama Lokasi</th><th>Keterangan</th><th>Aksi</th></tr></thead>
+          <tbody id="loc-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIPE -->
+    <div id="page-types" class="page" style="display:none">
+      <div class="topbar">
+        <div><div class="page-title">Master Tipe Aset</div><div class="page-sub">Kelola kategori dan tipe aset</div></div>
+        <button class="btn btn-primary" onclick="openModal('type')">+ Tambah Tipe</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Semua Tipe Aset</div>
+          <input class="input-search" placeholder="🔍 Cari tipe..." oninput="renderTypes(this.value)">
+        </div>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>#</th><th>Kode</th><th>Nama Tipe</th><th>Keterangan</th><th>Aksi</th></tr></thead>
+          <tbody id="type-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUMBER ASET -->
+    <div id="page-sources" class="page" style="display:none">
+      <div class="topbar">
+        <div><div class="page-title">Master Sumber Asset</div><div class="page-sub">Kelola sumber perolehan aset</div></div>
+        <button class="btn btn-primary" onclick="openModal('source')">+ Tambah Sumber</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Semua Sumber Asset</div>
+          <input class="input-search" placeholder="🔍 Cari sumber..." oninput="renderSources(this.value)">
+        </div>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>#</th><th>Kode</th><th>Nama Sumber</th><th>Keterangan</th><th>Aksi</th></tr></thead>
+          <tbody id="source-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ASET -->
+    <div id="page-assets" class="page" style="display:none">
+      <div class="topbar">
+        <div><div class="page-title">Manajemen Asset BNNK Sleman</div><div class="page-sub">Tambah, ubah, dan pantau seluruh aset</div></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-outline" onclick="printTable()">🖨️ Cetak / PDF</button>
+          <button class="btn btn-success" onclick="exportCSV()">📊 Ekspor Excel</button>
+          <button class="btn btn-primary" onclick="openModal('asset')">+ Tambah Aset</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Semua Aset</div>
+            <div class="card-title-sub" id="asset-count-info">0 aset • 0 unit</div>
+          </div>
+          <div class="card-actions">
+            <select class="input-search" id="filter-status" onchange="renderAssets()" style="width:145px">
+              <option value="">Semua Status</option>
+              <option value="Aktif">Aktif</option>
+              <option value="Pemeliharaan">Pemeliharaan</option>
+              <option value="Tidak Aktif">Tidak Aktif</option>
+            </select>
+            <select class="input-search" id="filter-loc" onchange="renderAssets()" style="width:170px"><option value="">Semua Lokasi</option></select>
+            <select class="input-search" id="filter-type" onchange="renderAssets()" style="width:160px"><option value="">Semua Tipe</option></select>
+            <select class="input-search" id="filter-source" onchange="renderAssets()" style="width:180px"><option value="">Semua Sumber</option></select>
+            <input class="input-search" id="asset-search" placeholder="🔍 Cari aset..." oninput="renderAssets()">
+            <button class="btn btn-outline" onclick="resetAssetFilters()">Reset Filter</button>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Kode</th><th>Nama Aset</th><th>Merk</th><th>Tipe</th><th>Lokasi</th><th>Sumber</th><th>Jumlah</th><th>Tgl. Perolehan</th><th>Nilai (Rp)</th><th>Status</th><th>Aksi</th></tr></thead>
+            <tbody id="asset-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PENGGUNA -->
+    <div id="page-users" class="page" style="display:none">
+      <div class="topbar">
+        <div><div class="page-title">Pengguna</div><div class="page-sub">Kelola akun login sistem</div></div>
+        <button class="btn btn-primary" onclick="openModal('user')">+ Tambah Pengguna</button>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Semua Pengguna</div></div>
+        <table><thead><tr><th>#</th><th>Username</th><th>Nama Lengkap</th><th>Peran</th><th>Aksi</th></tr></thead>
+        <tbody id="user-tbody"></tbody></table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="save-indicator">💾 Menyimpan...</div>
+
+<!-- MODAL LOKASI -->
+<div class="modal-overlay" id="modal-location">
+  <div class="modal">
+    <div class="modal-title" id="loc-modal-title">Tambah Lokasi</div>
+    <div class="form-row">
+      <div class="form-group"><label>Kode Lokasi</label><input id="loc-code" placeholder="cth. LOC-016"></div>
+      <div class="form-group"><label>Nama Lokasi</label><input id="loc-name" placeholder="cth. Ruang Server"></div>
+    </div>
+    <div class="form-group"><label>Keterangan</label><textarea id="loc-desc" placeholder="Keterangan opsional..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('location')">Batal</button>
+      <button class="btn btn-primary" onclick="saveLocation()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TIPE -->
+<div class="modal-overlay" id="modal-type">
+  <div class="modal">
+    <div class="modal-title" id="type-modal-title">Tambah Tipe Aset</div>
+    <div class="form-row">
+      <div class="form-group"><label>Kode Tipe</label><input id="type-code" placeholder="cth. ELK"></div>
+      <div class="form-group"><label>Nama Tipe</label><input id="type-name" placeholder="cth. Elektronik"></div>
+    </div>
+    <div class="form-group"><label>Keterangan</label><textarea id="type-desc" placeholder="Keterangan opsional..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('type')">Batal</button>
+      <button class="btn btn-primary" onclick="saveType()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SUMBER ASET -->
+<div class="modal-overlay" id="modal-source">
+  <div class="modal">
+    <div class="modal-title" id="source-modal-title">Tambah Sumber Asset</div>
+    <div class="form-row">
+      <div class="form-group"><label>Kode Sumber</label><input id="source-code" placeholder="cth. BMD"></div>
+      <div class="form-group"><label>Nama Sumber</label><input id="source-name" placeholder="cth. Barang Milik Daerah"></div>
+    </div>
+    <div class="form-group"><label>Keterangan</label><textarea id="source-desc" placeholder="Keterangan sumber aset..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('source')">Batal</button>
+      <button class="btn btn-primary" onclick="saveSource()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ASET -->
+<div class="modal-overlay" id="modal-asset">
+  <div class="modal">
+    <div class="modal-title" id="asset-modal-title">Tambah Aset</div>
+    <div class="form-row">
+      <div class="form-group"><label>Kode Aset</label><input id="ast-code" placeholder="cth. AST-0001"></div>
+      <div class="form-group"><label>Nama Aset</label><input id="ast-name" placeholder="cth. Laptop Dell XPS"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Merk / Brand</label><input id="ast-merk" placeholder="cth. Dell, Samsung, HP, Brother"></div>
+      <div class="form-group"><label>No. Seri / Serial</label><input id="ast-serial" placeholder="Opsional"></div>
+    </div>
+    <div class="form-row-3">
+      <div class="form-group"><label>Tipe Aset</label><select id="ast-type"><option value="">-- Pilih Tipe --</option></select></div>
+      <div class="form-group"><label>Lokasi</label><select id="ast-loc"><option value="">-- Pilih Lokasi --</option></select></div>
+      <div class="form-group"><label>Sumber Asset</label><select id="ast-source"><option value="">-- Pilih Sumber --</option></select></div>
+    </div>
+    <div class="form-row-3">
+      <div class="form-group"><label>Jumlah</label><input type="number" id="ast-jumlah" min="1" value="1"></div>
+      <div class="form-group"><label>Satuan</label><input id="ast-satuan" placeholder="Unit / Buah / Set"></div>
+      <div class="form-group"><label>Status</label>
+        <select id="ast-status">
+          <option value="Aktif">Aktif</option>
+          <option value="Pemeliharaan">Pemeliharaan</option>
+          <option value="Tidak Aktif">Tidak Aktif</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Tanggal Perolehan</label><input type="date" id="ast-date"></div>
+      <div class="form-group"><label>Nilai Perolehan (Rp)</label><input type="number" id="ast-value" placeholder="0"></div>
+    </div>
+    <div class="form-group"><label>Keterangan / Catatan</label><textarea id="ast-notes" placeholder="Tuliskan keterangan tambahan, kondisi, atau catatan penting..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('asset')">Batal</button>
+      <button class="btn btn-primary" onclick="saveAsset()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PENGGUNA -->
+<div class="modal-overlay" id="modal-user">
+  <div class="modal">
+    <div class="modal-title" id="user-modal-title">Tambah Pengguna</div>
+    <div class="form-row">
+      <div class="form-group"><label>Username</label><input id="usr-uname" placeholder="cth. budi"></div>
+      <div class="form-group"><label>Nama Lengkap</label><input id="usr-fname" placeholder="cth. Budi Santoso"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Password</label><input type="password" id="usr-pass"></div>
+      <div class="form-group"><label>Peran</label>
+        <select id="usr-role"><option value="Administrator">Administrator</option><option value="Viewer">Viewer</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('user')">Batal</button>
+      <button class="btn btn-primary" onclick="saveUser()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API='http://localhost:8765/api/data';
+const SESSION_KEY='bnn_asset_session';
+let DB=null,currentUser=null,editId=null,saveTimer=null;
+
+async function loadDB(){
+  try{
+    const r=await fetch(API);const j=await r.json();
+    if(j.ok&&j.data&&j.data.users){DB=j.data;}
+    else{DB=defaultDB();await persistDB();}
+    if(!Array.isArray(DB.sources)){
+      DB.sources=defaultSources();
+      await persistDB();
+    }
+  }catch(e){showServerError();return false;}
+  return true;
+}
+
+async function persistDB(){
+  showSave('saving');
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(DB)});
+    const j=await r.json();showSave(j.ok?'ok':'err');
+  }catch(e){showSave('err');}
+}
+
+function showSave(s){
+  const el=document.getElementById('save-indicator');clearTimeout(saveTimer);
+  if(s==='saving'){el.textContent='💾 Menyimpan...';el.className='show';}
+  else if(s==='ok'){el.textContent='✅ Tersimpan ke data.json';el.className='show ok';saveTimer=setTimeout(()=>el.className='',2500);}
+  else{el.textContent='❌ Gagal menyimpan';el.className='show err';saveTimer=setTimeout(()=>el.className='',4000);}
+}
+
+function showServerError(){
+  document.getElementById('loading-screen').innerHTML=`
+    <div style="text-align:center;max-width:460px;padding:32px">
+      <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:12px">Server Tidak Berjalan</div>
+      <div style="color:var(--text2);font-size:14px;line-height:1.8;margin-bottom:20px">
+        Jalankan <code style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:'IBM Plex Mono',monospace">server.py</code> terlebih dahulu, kemudian <b>refresh</b> halaman ini.
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:left;font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--accent2)">python server.py</div>
+      <div style="margin-top:8px;font-size:12px;color:var(--text2)">Windows: klik dua kali <b>START.bat</b></div>
+      <button onclick="location.reload()" style="margin-top:20px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;cursor:pointer;font-family:inherit">↺ Coba Lagi</button>
+    </div>`;
+}
+
+function defaultDB(){
+  return{
+    users:[{id:1,username:'admin',password:'admin123',fullname:'Administrator',role:'Administrator'}],
+    locations:[
+      {id:1, code:'LOC-001',name:'Ruang Rehabilitasi',desc:''},
+      {id:2, code:'LOC-002',name:'Ruang Kepala',desc:''},
+      {id:3, code:'LOC-003',name:'Ruang Tengah',desc:''},
+      {id:4, code:'LOC-004',name:'Ruang Keuangan',desc:''},
+      {id:5, code:'LOC-005',name:'Ruang Rapat',desc:''},
+      {id:6, code:'LOC-006',name:'Ruang Brantas',desc:''},
+      {id:7, code:'LOC-007',name:'Ruang Loby',desc:''},
+      {id:8, code:'LOC-008',name:'Ruang Satpam',desc:''},
+      {id:9, code:'LOC-009',name:'Ruang Klinik',desc:''},
+      {id:10,code:'LOC-010',name:'Ruang Garasi Mobil',desc:''},
+      {id:11,code:'LOC-011',name:'Ruang Garasi Motor',desc:''},
+      {id:12,code:'LOC-012',name:'Dapur',desc:''},
+      {id:13,code:'LOC-013',name:'Ruang P2M',desc:''},
+      {id:14,code:'LOC-014',name:'Ruang Arsip',desc:''},
+      {id:15,code:'LOC-015',name:'Ruang Gudang',desc:''}
+    ],
+    types:[
+      {id:1, code:'ELK',name:'Elektronik',          desc:'Komputer, laptop, printer, proyektor, scanner, dsb.'},
+      {id:2, code:'FRN',name:'Furnitur',             desc:'Meja, kursi, lemari, rak, sofa, dsb.'},
+      {id:3, code:'KDR',name:'Kendaraan',            desc:'Mobil, motor, dan kendaraan operasional lainnya'},
+      {id:4, code:'AMS',name:'Alat Medis & Kesehatan',desc:'Tensimeter, timbangan, alat terapi, P3K, dsb.'},
+      {id:5, code:'KMN',name:'Komunikasi & Jaringan',desc:'Telepon, HT, access point, switch, CCTV, dsb.'},
+      {id:6, code:'ATK',name:'Alat Tulis Kantor',    desc:'Peralatan kantor habis pakai dan non-habis pakai'},
+      {id:7, code:'RMT',name:'Peralatan Rumah Tangga',desc:'AC, kipas, kulkas, dispenser, TV, dsb.'},
+      {id:8, code:'SFT',name:'Perangkat Lunak',      desc:'Lisensi software, aplikasi, dan sistem operasi'},
+      {id:9, code:'KMN',name:'Keamanan & K3',        desc:'CCTV, alarm, APAR, tabung pemadam, dsb.'},
+      {id:10,code:'INF',name:'Infrastruktur',        desc:'Genset, panel listrik, UPS, instalasi jaringan'},
+      {id:11,code:'ARS',name:'Peralatan Arsip',      desc:'Rak arsip, filing cabinet, mesin shredder, dsb.'},
+      {id:12,code:'DAP',name:'Peralatan Dapur',      desc:'Kompor, peralatan masak, kulkas dapur, dispenser'},
+      {id:13,code:'KLN',name:'Kebersihan & Sanitasi',desc:'Vacuum cleaner, alat kebersihan, tempat sampah'},
+      {id:14,code:'OLR',name:'Rehabilitasi & Olahraga',desc:'Alat terapi fisik, alat olahraga, matras, parallel bar'},
+      {id:15,code:'TND',name:'Tanda & Papan Informasi',desc:'Papan nama, banner, papan pengumuman, rambu'}
+    ],
+    sources:defaultSources(),
+    assets:[]
+  };
+}
+
+function defaultSources(){
+  return[
+    {id:1,code:'BMD',name:'Barang Milik Daerah',desc:'Sumber daerah'},
+    {id:2,code:'BMN',name:'Barang Milik Negara',desc:'Sumber negara'}
+  ];
+}
+
+window.onload=async()=>{
+  const ok=await loadDB();
+  if(!ok)return;
+  document.getElementById('loading-screen').style.display='none';
+  const sessionUser=restoreSession();
+  if(sessionUser)applyLoginState(sessionUser);
+  else document.getElementById('login-screen').style.display='flex';
+};
+
+function doLogin(){
+  const u=document.getElementById('login-user').value.trim();
+  const p=document.getElementById('login-pass').value.trim();
+  const user=DB.users.find(x=>x.username===u&&x.password===p);
+  if(!user){document.getElementById('login-err').style.display='block';return;}
+  saveSession(user);
+  applyLoginState(user);
+}
+
+function doLogout(){
+  currentUser=null;
+  clearSession();
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-pass').value='';
+}
+
+function applyLoginState(user){
+  currentUser=user;
+  document.getElementById('login-err').style.display='none';
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('user-display').textContent=user.fullname;
+  document.getElementById('user-avatar').textContent=user.fullname[0].toUpperCase();
+  document.getElementById('user-role-display').textContent=user.role;
+  showPage('dashboard');
+}
+
+function saveSession(user){
+  localStorage.setItem(SESSION_KEY,JSON.stringify({uid:user.id}));
+}
+
+function clearSession(){
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function restoreSession(){
+  try{
+    const raw=localStorage.getItem(SESSION_KEY);
+    if(!raw)return null;
+    const parsed=JSON.parse(raw);
+    const user=DB.users.find(u=>u.id===parsed.uid);
+    if(!user){clearSession();return null;}
+    return user;
+  }catch(e){
+    clearSession();
+    return null;
+  }
+}
+
+function showPage(pg){
+  document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+pg).style.display='block';
+  document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+pg+"'"))n.classList.add('active');});
+  if(pg==='dashboard')renderDashboard();
+  if(pg==='locations')renderLocations();
+  if(pg==='types')renderTypes();
+  if(pg==='sources')renderSources();
+  if(pg==='assets'){populateFilters();renderAssets();}
+  if(pg==='users')renderUsers();
+}
+
+function uid(){return Date.now()+Math.floor(Math.random()*9999);}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtNum(n){return Number(n||0).toLocaleString('id-ID');}
+function badge(s){const m={'Aktif':'badge-active','Pemeliharaan':'badge-maintenance','Tidak Aktif':'badge-inactive'};return`<span class="badge ${m[s]||'badge-inactive'}">${esc(s)}</span>`;}
+function getTypeName(id){const t=DB.types.find(x=>x.id==id);return t?t.name:'-';}
+function getLocName(id){const l=DB.locations.find(x=>x.id==id);return l?l.name:'-';}
+function getSourceName(id){const s=DB.sources.find(x=>x.id==id);return s?s.name:'-';}
+function nextLocationCode(){
+  const maxNum=DB.locations.reduce((max,x)=>{
+    const m=String(x.code||'').toUpperCase().match(/^LOC-(\d+)$/);
+    return m?Math.max(max,Number(m[1])):max;
+  },0);
+  return `LOC-${String(maxNum+1).padStart(3,'0')}`;
+}
+function emptyRow(n){return`<tr><td colspan="${n}"><div class="empty-state"><div class="icon">📭</div><p>Belum ada data</p></div></td></tr>`;}
+
+function buildGroupSummary(master,idKey,labelBuilder){
+  const idx=new Map(master.map(m=>[m.id,{id:m.id,label:labelBuilder(m),assetCount:0,unitCount:0}]));
+  DB.assets.forEach(a=>{
+    const id=a[idKey];
+    const qty=Number(a.jumlah)||1;
+    if(!idx.has(id))idx.set(id,{id,label:'Tidak diketahui',assetCount:0,unitCount:0});
+    const row=idx.get(id);
+    row.assetCount+=1;
+    row.unitCount+=qty;
+  });
+  return Array.from(idx.values()).sort((x,y)=>y.unitCount-x.unitCount||y.assetCount-x.assetCount||x.label.localeCompare(y.label));
+}
+
+function renderSummaryTable(tbodyId,rows,totalUnits,maxRows=10){
+  const shown=rows.filter(r=>r.assetCount>0).slice(0,maxRows);
+  const body=document.getElementById(tbodyId);
+  if(!shown.length){body.innerHTML='<tr><td colspan="4" style="padding:14px;color:var(--text2);text-align:center">Belum ada data aset</td></tr>';return;}
+  body.innerHTML=shown.map(r=>{
+    const pct=totalUnits?Math.round((r.unitCount/totalUnits)*100):0;
+    return `<tr>
+      <td class="insight-name">${esc(r.label)}</td>
+      <td class="insight-num">${esc(r.assetCount)}</td>
+      <td class="insight-num">${esc(r.unitCount)}</td>
+      <td class="insight-bar">
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <div class="bar-txt">${pct}%</div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderDashboard(){
+  const a=DB.assets;
+  const totalUnit=a.reduce((sum,x)=>sum+(Number(x.jumlah)||1),0);
+  document.getElementById('stat-total').textContent=a.length;
+  document.getElementById('stat-unit').textContent=fmtNum(totalUnit);
+  document.getElementById('stat-active').textContent=a.filter(x=>x.status==='Aktif').length;
+  document.getElementById('stat-maint').textContent=a.filter(x=>x.status==='Pemeliharaan').length;
+  document.getElementById('stat-inactive').textContent=a.filter(x=>x.status==='Tidak Aktif').length;
+  renderSummaryTable('dash-loc-summary',buildGroupSummary(DB.locations,'locId',x=>x.name),totalUnit,10);
+  renderSummaryTable('dash-type-summary',buildGroupSummary(DB.types,'typeId',x=>x.name),totalUnit,10);
+  renderSummaryTable('dash-source-summary',buildGroupSummary(DB.sources,'sourceId',x=>`${x.code} - ${x.name}`),totalUnit,10);
+  const recent=[...a].reverse().slice(0,8);
+  document.getElementById('dash-recent').innerHTML=recent.length?recent.map(x=>`
+    <tr>
+      <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent)">${esc(x.code)}</code></td>
+      <td><b>${esc(x.name)}</b></td>
+      <td>${esc(x.merk||'-')}</td>
+      <td>${esc(getTypeName(x.typeId))}</td>
+      <td>${esc(getLocName(x.locId))}</td>
+      <td>${esc(getSourceName(x.sourceId))}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:12px">${esc(x.jumlah||1)} ${esc(x.satuan||'Unit')}</td>
+      <td>${badge(x.status)}</td>
+    </tr>`).join(''):emptyRow(8);
+}
+
+function renderLocations(q=''){
+  const rows=DB.locations.filter(x=>!q||x.code.toLowerCase().includes(q.toLowerCase())||x.name.toLowerCase().includes(q.toLowerCase()));
+  document.getElementById('loc-tbody').innerHTML=rows.length?rows.map((x,i)=>`
+    <tr><td>${i+1}</td>
+    <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent2)">${esc(x.code)}</code></td>
+    <td><b>${esc(x.name)}</b></td>
+    <td style="color:var(--text2)">${esc(x.desc)||'-'}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-outline btn-sm" onclick="openModal('location',${x.id})">✏️ Ubah</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteItem('location',${x.id})">🗑</button>
+    </td></tr>`).join(''):emptyRow(5);
+}
+
+function saveLocation(){
+  const code=document.getElementById('loc-code').value.trim().toUpperCase();
+  const name=document.getElementById('loc-name').value.trim();
+  if(!code||!name){alert('Kode dan Nama wajib diisi');return;}
+  const duplicate=DB.locations.find(l=>l.code.toUpperCase()===code&&l.id!=editId);
+  if(duplicate){alert('Kode lokasi sudah digunakan');return;}
+  const desc=document.getElementById('loc-desc').value.trim();
+  if(editId){const x=DB.locations.find(l=>l.id==editId);x.code=code;x.name=name;x.desc=desc;}
+  else DB.locations.push({id:uid(),code,name,desc});
+  persistDB();closeModal('location');renderLocations();
+}
+
+function renderTypes(q=''){
+  const rows=DB.types.filter(x=>!q||x.code.toLowerCase().includes(q.toLowerCase())||x.name.toLowerCase().includes(q.toLowerCase()));
+  document.getElementById('type-tbody').innerHTML=rows.length?rows.map((x,i)=>`
+    <tr><td>${i+1}</td>
+    <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--warn)">${esc(x.code)}</code></td>
+    <td><b>${esc(x.name)}</b></td>
+    <td style="color:var(--text2)">${esc(x.desc)||'-'}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-outline btn-sm" onclick="openModal('type',${x.id})">✏️ Ubah</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteItem('type',${x.id})">🗑</button>
+    </td></tr>`).join(''):emptyRow(5);
+}
+
+function saveType(){
+  const code=document.getElementById('type-code').value.trim().toUpperCase();
+  const name=document.getElementById('type-name').value.trim();
+  if(!code||!name){alert('Kode dan Nama wajib diisi');return;}
+  const duplicate=DB.types.find(t=>t.code.toUpperCase()===code&&t.id!=editId);
+  if(duplicate){alert('Kode tipe sudah digunakan');return;}
+  const desc=document.getElementById('type-desc').value.trim();
+  if(editId){const x=DB.types.find(t=>t.id==editId);x.code=code;x.name=name;x.desc=desc;}
+  else DB.types.push({id:uid(),code,name,desc});
+  persistDB();closeModal('type');renderTypes();
+}
+
+function renderSources(q=''){
+  const rows=DB.sources.filter(x=>!q||x.code.toLowerCase().includes(q.toLowerCase())||x.name.toLowerCase().includes(q.toLowerCase()));
+  document.getElementById('source-tbody').innerHTML=rows.length?rows.map((x,i)=>`
+    <tr><td>${i+1}</td>
+    <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent2)">${esc(x.code)}</code></td>
+    <td><b>${esc(x.name)}</b></td>
+    <td style="color:var(--text2)">${esc(x.desc)||'-'}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-outline btn-sm" onclick="openModal('source',${x.id})">✏️ Ubah</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteItem('source',${x.id})">🗑</button>
+    </td></tr>`).join(''):emptyRow(5);
+}
+
+function saveSource(){
+  const code=document.getElementById('source-code').value.trim().toUpperCase();
+  const name=document.getElementById('source-name').value.trim();
+  if(!code||!name){alert('Kode dan Nama wajib diisi');return;}
+  const duplicate=DB.sources.find(s=>s.code.toUpperCase()===code&&s.id!=editId);
+  if(duplicate){alert('Kode sumber sudah digunakan');return;}
+  const desc=document.getElementById('source-desc').value.trim();
+  if(editId){const x=DB.sources.find(s=>s.id==editId);x.code=code;x.name=name;x.desc=desc;}
+  else DB.sources.push({id:uid(),code,name,desc});
+  persistDB();closeModal('source');renderSources();
+}
+
+function populateFilters(){
+  const fl=document.getElementById('filter-loc');
+  const ft=document.getElementById('filter-type');
+  const fs=document.getElementById('filter-source');
+  if(fl)fl.innerHTML='<option value="">Semua Lokasi</option>'+DB.locations.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');
+  if(ft)ft.innerHTML='<option value="">Semua Tipe</option>'+DB.types.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  if(fs)fs.innerHTML='<option value="">Semua Sumber</option>'+DB.sources.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
+}
+
+function populateAssetSelects(){
+  document.getElementById('ast-type').innerHTML='<option value="">-- Pilih Tipe --</option>'+DB.types.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  document.getElementById('ast-loc').innerHTML='<option value="">-- Pilih Lokasi --</option>'+DB.locations.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');
+  document.getElementById('ast-source').innerHTML='<option value="">-- Pilih Sumber --</option>'+DB.sources.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
+}
+
+function getFilteredAssets(){
+  const q=(document.getElementById('asset-search')||{value:''}).value.toLowerCase();
+  const fs=(document.getElementById('filter-status')||{value:''}).value;
+  const fl=(document.getElementById('filter-loc')||{value:''}).value;
+  const ft=(document.getElementById('filter-type')||{value:''}).value;
+  const fsrc=(document.getElementById('filter-source')||{value:''}).value;
+  return DB.assets.filter(x=>{
+    const match=!q||x.code.toLowerCase().includes(q)||x.name.toLowerCase().includes(q)||(x.merk||'').toLowerCase().includes(q)||getTypeName(x.typeId).toLowerCase().includes(q)||getLocName(x.locId).toLowerCase().includes(q)||getSourceName(x.sourceId).toLowerCase().includes(q);
+    return match&&(!fs||x.status===fs)&&(!fl||x.locId==fl)&&(!ft||x.typeId==ft)&&(!fsrc||x.sourceId==fsrc);
+  });
+}
+
+function resetAssetFilters(){
+  const ids=['filter-status','filter-loc','filter-type','filter-source','asset-search'];
+  ids.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  renderAssets();
+}
+
+function renderAssets(){
+  const rows=getFilteredAssets();
+  const filteredUnits=rows.reduce((sum,x)=>sum+(Number(x.jumlah)||1),0);
+  const countInfo=document.getElementById('asset-count-info');
+  if(countInfo)countInfo.textContent=`${fmtNum(rows.length)} aset • ${fmtNum(filteredUnits)} unit`;
+  document.getElementById('asset-tbody').innerHTML=rows.length?rows.map((x,i)=>`
+    <tr><td>${i+1}</td>
+    <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent)">${esc(x.code)}</code></td>
+    <td><b>${esc(x.name)}</b>${x.notes?`<br><span style="font-size:11px;color:var(--text2)">${esc(x.notes.length>45?x.notes.slice(0,45)+'…':x.notes)}</span>`:''}</td>
+    <td>${esc(x.merk||'-')}</td>
+    <td>${esc(getTypeName(x.typeId))}</td>
+    <td>${esc(getLocName(x.locId))}</td>
+    <td>${esc(getSourceName(x.sourceId))}</td>
+    <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:12px">${esc(x.jumlah||1)}<br><span style="font-size:10px;color:var(--text2)">${esc(x.satuan||'Unit')}</span></td>
+    <td style="color:var(--text2);white-space:nowrap">${x.date||'-'}</td>
+    <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap">${fmtNum(x.value)}</td>
+    <td>${badge(x.status)}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-outline btn-sm" onclick="openModal('asset',${x.id})">✏️</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteItem('asset',${x.id})">🗑</button>
+    </td></tr>`).join(''):emptyRow(12);
+}
+
+function saveAsset(){
+  const code=document.getElementById('ast-code').value.trim().toUpperCase();
+  const name=document.getElementById('ast-name').value.trim();
+  const typeId=document.getElementById('ast-type').value;
+  const locId=document.getElementById('ast-loc').value;
+  const sourceId=document.getElementById('ast-source').value;
+  if(!code||!name||!typeId||!locId||!sourceId){alert('Kode, Nama, Tipe, Lokasi, dan Sumber Asset wajib diisi');return;}
+  const duplicate=DB.assets.find(a=>a.code.toUpperCase()===code&&a.id!=editId);
+  if(duplicate){alert('Kode aset sudah digunakan');return;}
+  const obj={
+    code,name,
+    merk:document.getElementById('ast-merk').value.trim(),
+    serial:document.getElementById('ast-serial').value.trim(),
+    typeId:Number(typeId),locId:Number(locId),sourceId:Number(sourceId),
+    jumlah:Number(document.getElementById('ast-jumlah').value)||1,
+    satuan:document.getElementById('ast-satuan').value.trim()||'Unit',
+    status:document.getElementById('ast-status').value,
+    date:document.getElementById('ast-date').value,
+    value:Number(document.getElementById('ast-value').value)||0,
+    notes:document.getElementById('ast-notes').value.trim()
+  };
+  if(editId){const x=DB.assets.find(a=>a.id==editId);Object.assign(x,obj);}
+  else DB.assets.push({id:uid(),...obj});
+  persistDB();closeModal('asset');renderAssets();
+}
+
+function renderUsers(){
+  document.getElementById('user-tbody').innerHTML=DB.users.map((x,i)=>`
+    <tr><td>${i+1}</td>
+    <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px">${esc(x.username)}</code></td>
+    <td>${esc(x.fullname)}</td>
+    <td><span class="badge ${x.role==='Administrator'?'badge-active':'badge-inactive'}">${esc(x.role)}</span></td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-outline btn-sm" onclick="openModal('user',${x.id})">✏️ Ubah</button>
+      ${DB.users.length>1?`<button class="btn btn-danger btn-sm" onclick="deleteItem('user',${x.id})">🗑</button>`:''}
+    </td></tr>`).join('');
+}
+
+function saveUser(){
+  const uname=document.getElementById('usr-uname').value.trim();
+  const fname=document.getElementById('usr-fname').value.trim();
+  const pass=document.getElementById('usr-pass').value.trim();
+  const role=document.getElementById('usr-role').value;
+  if(!uname||!fname){alert('Username dan Nama Lengkap wajib diisi');return;}
+  if(editId){const x=DB.users.find(u=>u.id==editId);x.username=uname;x.fullname=fname;x.role=role;if(pass)x.password=pass;}
+  else{if(!pass){alert('Password wajib diisi');return;}if(DB.users.find(u=>u.username===uname)){alert('Username sudah digunakan');return;}DB.users.push({id:uid(),username:uname,password:pass,fullname:fname,role});}
+  persistDB();closeModal('user');renderUsers();
+}
+
+function deleteItem(ctx,id){
+  if(ctx==='location'&&DB.assets.find(a=>a.locId==id)){alert('Tidak dapat dihapus: lokasi ini masih digunakan oleh aset.');return;}
+  if(ctx==='type'&&DB.assets.find(a=>a.typeId==id)){alert('Tidak dapat dihapus: tipe ini masih digunakan oleh aset.');return;}
+  if(ctx==='source'&&DB.assets.find(a=>a.sourceId==id)){alert('Tidak dapat dihapus: sumber asset ini masih digunakan oleh aset.');return;}
+  if(ctx==='user'&&id==currentUser.id){alert('Tidak dapat menghapus akun Anda sendiri.');return;}
+  if(!confirm('Yakin ingin menghapus data ini?'))return;
+  if(ctx==='location')DB.locations=DB.locations.filter(x=>x.id!=id);
+  if(ctx==='type')DB.types=DB.types.filter(x=>x.id!=id);
+  if(ctx==='source')DB.sources=DB.sources.filter(x=>x.id!=id);
+  if(ctx==='asset')DB.assets=DB.assets.filter(x=>x.id!=id);
+  if(ctx==='user')DB.users=DB.users.filter(x=>x.id!=id);
+  persistDB();
+  if(ctx==='location')renderLocations();
+  if(ctx==='type')renderTypes();
+  if(ctx==='source')renderSources();
+  if(ctx==='asset')renderAssets();
+  if(ctx==='user')renderUsers();
+}
+
+function openModal(ctx,id=null){
+  editId=id;
+  document.getElementById('modal-'+ctx).classList.add('open');
+  if(ctx==='location'){
+    document.getElementById('loc-modal-title').textContent=id?'Ubah Lokasi':'Tambah Lokasi';
+    if(id){const x=DB.locations.find(l=>l.id==id);document.getElementById('loc-code').value=x.code;document.getElementById('loc-name').value=x.name;document.getElementById('loc-desc').value=x.desc;}
+    else{
+      document.getElementById('loc-code').value=nextLocationCode();
+      ['loc-name','loc-desc'].forEach(i=>document.getElementById(i).value='');
+    }
+  }
+  if(ctx==='type'){
+    document.getElementById('type-modal-title').textContent=id?'Ubah Tipe Aset':'Tambah Tipe Aset';
+    if(id){const x=DB.types.find(t=>t.id==id);document.getElementById('type-code').value=x.code;document.getElementById('type-name').value=x.name;document.getElementById('type-desc').value=x.desc;}
+    else{['type-code','type-name','type-desc'].forEach(i=>document.getElementById(i).value='');}
+  }
+  if(ctx==='source'){
+    document.getElementById('source-modal-title').textContent=id?'Ubah Sumber Asset':'Tambah Sumber Asset';
+    if(id){const x=DB.sources.find(s=>s.id==id);document.getElementById('source-code').value=x.code;document.getElementById('source-name').value=x.name;document.getElementById('source-desc').value=x.desc;}
+    else{['source-code','source-name','source-desc'].forEach(i=>document.getElementById(i).value='');}
+  }
+  if(ctx==='asset'){
+    document.getElementById('asset-modal-title').textContent=id?'Ubah Aset':'Tambah Aset';
+    populateAssetSelects();
+    if(id){
+      const x=DB.assets.find(a=>a.id==id);
+      document.getElementById('ast-code').value=x.code;
+      document.getElementById('ast-name').value=x.name;
+      document.getElementById('ast-merk').value=x.merk||'';
+      document.getElementById('ast-serial').value=x.serial||'';
+      document.getElementById('ast-type').value=x.typeId;
+      document.getElementById('ast-loc').value=x.locId;
+      document.getElementById('ast-source').value=x.sourceId||'';
+      document.getElementById('ast-jumlah').value=x.jumlah||1;
+      document.getElementById('ast-satuan').value=x.satuan||'Unit';
+      document.getElementById('ast-status').value=x.status;
+      document.getElementById('ast-date').value=x.date||'';
+      document.getElementById('ast-value').value=x.value||0;
+      document.getElementById('ast-notes').value=x.notes||'';
+    }else{
+      ['ast-code','ast-name','ast-merk','ast-serial','ast-notes'].forEach(i=>document.getElementById(i).value='');
+      document.getElementById('ast-jumlah').value=1;
+      document.getElementById('ast-satuan').value='Unit';
+      document.getElementById('ast-date').value=new Date().toISOString().split('T')[0];
+      document.getElementById('ast-value').value='';
+      document.getElementById('ast-source').value='';
+      document.getElementById('ast-status').value='Aktif';
+    }
+  }
+  if(ctx==='user'){
+    document.getElementById('user-modal-title').textContent=id?'Ubah Pengguna':'Tambah Pengguna';
+    if(id){const x=DB.users.find(u=>u.id==id);document.getElementById('usr-uname').value=x.username;document.getElementById('usr-fname').value=x.fullname;document.getElementById('usr-pass').value='';document.getElementById('usr-role').value=x.role;}
+    else{['usr-uname','usr-fname','usr-pass'].forEach(i=>document.getElementById(i).value='');}
+  }
+}
+
+function closeModal(ctx){document.getElementById('modal-'+ctx).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+
+function fmtTanggalLaporan(d=new Date()){
+  return d.toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'});
+}
+
+function getSelectedRoomName(){
+  const fl=(document.getElementById('filter-loc')||{value:''}).value;
+  if(!fl)return 'SEMUA RUANGAN';
+  const loc=DB.locations.find(l=>l.id==fl);
+  return (loc?loc.name:'SEMUA RUANGAN').toUpperCase();
+}
+
+function getExportMerkType(x){
+  const merk=(x.merk||'').trim();
+  const tipe=getTypeName(x.typeId);
+  if(merk&&tipe&&tipe!=='-')return `${merk} / ${tipe}`;
+  if(merk)return merk;
+  return tipe||'-';
+}
+
+function getExportKeterangan(x){
+  const notes=(x.notes||'').trim();
+  if(notes)return notes;
+  const sumber=getSourceName(x.sourceId);
+  return sumber&&sumber!=='-'?`Sumber: ${sumber}`:'-';
+}
+
+function printTable(){
+  const rows=getFilteredAssets();
+  const cetakDate=fmtTanggalLaporan();
+  const roomName=getSelectedRoomName();
+  const w=window.open('','_blank','width=1000,height=760');
+  const html=`<!DOCTYPE html><html><head><title>DAFTAR BARANG RUANGAN</title>
+  <style>
+    @page{size:A4 portrait;margin:10mm}
+    body{font-family:Arial,sans-serif;padding:24px 30px;color:#111;font-size:11px}
+    .meta{width:100%;font-size:12px;line-height:1.45}
+    .meta td{padding:0}
+    .meta .right{text-align:right;font-size:11px}
+    .title{font-size:21px;font-weight:700;text-align:center;margin:14px 0 12px}
+    .room{font-size:12px;margin-bottom:10px}
+    .tbl{width:100%;border-collapse:collapse;border:1px solid #000}
+    .tbl th,.tbl td{border:1px solid #000;padding:5px 6px;vertical-align:top;font-size:11px}
+    .tbl th{background:#d3d3d3;font-weight:700;text-align:center}
+    .col-no{width:40px;text-align:center}
+    .col-name{width:42%}
+    .col-merk{width:24%}
+    .col-jumlah{width:90px;text-align:center}
+    .col-ket{width:24%}
+    .notice{font-size:10px;margin-top:8px}
+    .sign-wrap{width:100%;margin-top:18px;border-collapse:collapse}
+    .sign-wrap td{width:33.33%;text-align:center;font-size:11px;vertical-align:top}
+    .sign-date{text-align:right;padding-right:6px;font-size:11px;margin-bottom:4px}
+    .sign-gap{height:56px}
+    @media print{
+      html,body{width:210mm;height:297mm}
+      button{display:none}
+    }
+  </style></head><body>
+  <table class="meta">
+    <tr><td>NAMA UPB</td><td>: BNN KABUPATEN SLEMAN</td><td class="right">Tgl Cetak : ${cetakDate}</td></tr>
+    <tr><td>KODE UPB</td><td>:</td><td class="right">Halaman 1</td></tr>
+  </table>
+  <div class="title">DAFTAR BARANG RUANGAN</div>
+  <div class="room">NAMA RUANGAN : ${esc(roomName)}</div>
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th class="col-no">No</th>
+        <th class="col-name">Nama Barang</th>
+        <th class="col-merk">Merk/Type</th>
+        <th class="col-jumlah">Jumlah Barang</th>
+        <th class="col-ket">Keterangan (Digunakan oleh)</th>
+      </tr>
+    </thead>
+    <tbody>${rows.map((x,i)=>`<tr>
+      <td class="col-no">${i+1}</td>
+      <td>${esc(x.name)}</td>
+      <td>${esc(getExportMerkType(x))}</td>
+      <td class="col-jumlah">${esc(`${x.jumlah||1} ${x.satuan||'Buah'}`)}</td>
+      <td>${esc(getExportKeterangan(x))}</td>
+    </tr>`).join('')}</tbody>
+  </table>
+  <div class="notice">Tidak dibenarkan memindahkan barang-barang yang ada pada daftar ini tanpa sepengetahuan penanggung jawab Unit Akuntansi Kuasa Pengguna Barang (UAKPB) dan penanggung jawab ruangan ini.</div>
+  <div class="sign-date">Yogyakarta, ${cetakDate}</div>
+  <table class="sign-wrap">
+    <tr>
+      <td>Penanggung Jawab UAKPB,</td>
+      <td>Penanggung Jawab Ruangan,</td>
+      <td>Kepala BNN Kab. Sleman</td>
+    </tr>
+    <tr><td class="sign-gap"></td><td class="sign-gap"></td><td class="sign-gap"></td></tr>
+    <tr>
+      <td>____________________</td>
+      <td>____________________</td>
+      <td>____________________</td>
+    </tr>
+  </table>
+  <br><button onclick="window.print()" style="padding:8px 20px;background:#1a2340;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Cetak / Simpan sebagai PDF</button>
+  </body></html>`;
+  w.document.write(html);w.document.close();
+}
+
+function exportCSV(){
+  const rows=getFilteredAssets();
+  const cetakDate=fmtTanggalLaporan();
+  const roomName=getSelectedRoomName();
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{font-family:Arial,sans-serif;color:#111}
+    table{border-collapse:collapse;width:100%}
+    .meta td{padding:2px 4px;font-size:12px}
+    .right{text-align:right}
+    .title{font-size:20px;font-weight:700;text-align:center;padding:10px 0}
+    .room{font-size:12px;padding-bottom:8px}
+    .tbl th,.tbl td{border:1px solid #000;padding:5px 6px;font-size:11px;vertical-align:top}
+    .tbl th{background:#d3d3d3;text-align:center;font-weight:700}
+    .no{width:40px;text-align:center}
+    .jumlah{width:95px;text-align:center}
+    .sign td{text-align:center;font-size:11px;padding-top:8px}
+  </style></head><body>
+  <table class="meta">
+    <tr><td>NAMA UPB</td><td>: BNN KABUPATEN SLEMAN</td><td class="right">Tgl Cetak : ${cetakDate}</td></tr>
+    <tr><td>KODE UPB</td><td>:</td><td class="right">Halaman 1</td></tr>
+  </table>
+  <div class="title">DAFTAR BARANG RUANGAN</div>
+  <div class="room">NAMA RUANGAN : ${esc(roomName)}</div>
+  <table class="tbl">
+    <thead><tr><th class="no">No</th><th>Nama Barang</th><th>Merk/Type</th><th class="jumlah">Jumlah Barang</th><th>Keterangan (Digunakan oleh)</th></tr></thead>
+    <tbody>
+      ${rows.map((x,i)=>`<tr>
+        <td class="no">${i+1}</td>
+        <td>${esc(x.name)}</td>
+        <td>${esc(getExportMerkType(x))}</td>
+        <td class="jumlah">${esc(`${x.jumlah||1} ${x.satuan||'Buah'}`)}</td>
+        <td>${esc(getExportKeterangan(x))}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>
+  <div style="font-size:10px;padding-top:6px">Tidak dibenarkan memindahkan barang-barang yang ada pada daftar ini tanpa sepengetahuan penanggung jawab Unit Akuntansi Kuasa Pengguna Barang (UAKPB) dan penanggung jawab ruangan ini.</div>
+  <table class="sign" style="margin-top:14px;width:100%">
+    <tr><td colspan="3" style="text-align:right;padding-right:6px">Yogyakarta, ${cetakDate}</td></tr>
+    <tr><td>Penanggung Jawab UAKPB,</td><td>Penanggung Jawab Ruangan,</td><td>Kepala BNN Kab. Sleman</td></tr>
+    <tr><td style="height:58px"></td><td></td><td></td></tr>
+    <tr><td>____________________</td><td>____________________</td><td>____________________</td></tr>
+  </table>
+  </body></html>`;
+  const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='DAFTAR_BARANG_RUANGAN_'+new Date().toISOString().slice(0,10)+'.xls';a.click();
+}
+</script>
+</body>
+</html>
