@@ -183,6 +183,9 @@
     <div id="page-dashboard" class="page">
       <div class="topbar">
         <div><div class="page-title">Dashboard</div><div class="page-sub">Ringkasan seluruh aset</div></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-outline" onclick="printDashboardPDF()">🖨️ Cetak Dashboard / PDF</button>
+        </div>
       </div>
       <div class="data-notice">✅ Data tersimpan otomatis ke <b>data.json</b> di folder yang sama. Salin seluruh folder untuk memindahkan ke komputer lain.</div>
       <div class="stats-grid">
@@ -243,7 +246,7 @@
     <div id="page-locations" class="page" style="display:none">
       <div class="topbar">
         <div><div class="page-title">Master Lokasi</div><div class="page-sub">Kelola data lokasi penempatan aset</div></div>
-        <button class="btn btn-primary" onclick="openModal('location')">+ Tambah Lokasi</button>
+        <button class="btn btn-primary" data-write="1" onclick="openModal('location')">+ Tambah Lokasi</button>
       </div>
       <div class="card">
         <div class="card-header">
@@ -261,7 +264,7 @@
     <div id="page-types" class="page" style="display:none">
       <div class="topbar">
         <div><div class="page-title">Master Tipe Aset</div><div class="page-sub">Kelola kategori dan tipe aset</div></div>
-        <button class="btn btn-primary" onclick="openModal('type')">+ Tambah Tipe</button>
+        <button class="btn btn-primary" data-write="1" onclick="openModal('type')">+ Tambah Tipe</button>
       </div>
       <div class="card">
         <div class="card-header">
@@ -279,7 +282,7 @@
     <div id="page-sources" class="page" style="display:none">
       <div class="topbar">
         <div><div class="page-title">Master Sumber Asset</div><div class="page-sub">Kelola sumber perolehan aset</div></div>
-        <button class="btn btn-primary" onclick="openModal('source')">+ Tambah Sumber</button>
+        <button class="btn btn-primary" data-write="1" onclick="openModal('source')">+ Tambah Sumber</button>
       </div>
       <div class="card">
         <div class="card-header">
@@ -300,7 +303,7 @@
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-outline" onclick="printTable()">🖨️ Cetak / PDF</button>
           <button class="btn btn-success" onclick="exportCSV()">📊 Ekspor Excel</button>
-          <button class="btn btn-primary" onclick="openModal('asset')">+ Tambah Aset</button>
+          <button class="btn btn-primary" data-write="1" onclick="openModal('asset')">+ Tambah Aset</button>
         </div>
       </div>
       <div class="card">
@@ -336,7 +339,7 @@
     <div id="page-users" class="page" style="display:none">
       <div class="topbar">
         <div><div class="page-title">Pengguna</div><div class="page-sub">Kelola akun login sistem</div></div>
-        <button class="btn btn-primary" onclick="openModal('user')">+ Tambah Pengguna</button>
+        <button class="btn btn-primary" data-write="1" onclick="openModal('user')">+ Tambah Pengguna</button>
       </div>
       <div class="card">
         <div class="card-header"><div class="card-title">Semua Pengguna</div></div>
@@ -463,6 +466,24 @@
 const API='http://localhost:8765/api/data';
 const SESSION_KEY='bnn_asset_session';
 let DB=null,currentUser=null,editId=null,saveTimer=null;
+const WRITE_CONTEXTS=new Set(['location','type','source','asset','user']);
+
+function isViewer(){
+  return !!currentUser&&currentUser.role==='Viewer';
+}
+
+function ensureCanWrite(){
+  if(isViewer()){
+    alert('Role Viewer hanya bisa melihat data.');
+    return false;
+  }
+  return true;
+}
+
+function updateRoleUI(){
+  const hide=isViewer();
+  document.querySelectorAll('[data-write]').forEach(el=>el.style.display=hide?'none':'');
+}
 
 async function loadDB(){
   try{
@@ -554,6 +575,7 @@ function applyLoginState(user){
   document.getElementById('user-display').textContent=user.fullname;
   document.getElementById('user-avatar').textContent=user.fullname[0].toUpperCase();
   document.getElementById('user-role-display').textContent=user.role;
+  updateRoleUI();
   showPage('dashboard');
 }
 
@@ -671,13 +693,14 @@ function renderLocations(q=''){
     <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent2)">${esc(x.code)}</code></td>
     <td><b>${esc(x.name)}</b></td>
     <td style="color:var(--text2)">${esc(x.desc)||'-'}</td>
-    <td style="white-space:nowrap">
+    <td style="white-space:nowrap">${isViewer()?'':`
       <button class="btn btn-outline btn-sm" onclick="openModal('location',${x.id})">✏️ Ubah</button>
       <button class="btn btn-danger btn-sm" onclick="deleteItem('location',${x.id})">🗑</button>
-    </td></tr>`).join(''):emptyRow(5);
+    `}</td></tr>`).join(''):emptyRow(5);
 }
 
 function saveLocation(){
+  if(!ensureCanWrite())return;
   const code=document.getElementById('loc-code').value.trim().toUpperCase();
   const name=document.getElementById('loc-name').value.trim();
   if(!code||!name){alert('Kode dan Nama wajib diisi');return;}
@@ -696,13 +719,14 @@ function renderTypes(q=''){
     <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--warn)">${esc(x.code)}</code></td>
     <td><b>${esc(x.name)}</b></td>
     <td style="color:var(--text2)">${esc(x.desc)||'-'}</td>
-    <td style="white-space:nowrap">
+    <td style="white-space:nowrap">${isViewer()?'':`
       <button class="btn btn-outline btn-sm" onclick="openModal('type',${x.id})">✏️ Ubah</button>
       <button class="btn btn-danger btn-sm" onclick="deleteItem('type',${x.id})">🗑</button>
-    </td></tr>`).join(''):emptyRow(5);
+    `}</td></tr>`).join(''):emptyRow(5);
 }
 
 function saveType(){
+  if(!ensureCanWrite())return;
   const code=document.getElementById('type-code').value.trim().toUpperCase();
   const name=document.getElementById('type-name').value.trim();
   if(!code||!name){alert('Kode dan Nama wajib diisi');return;}
@@ -721,13 +745,14 @@ function renderSources(q=''){
     <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent2)">${esc(x.code)}</code></td>
     <td><b>${esc(x.name)}</b></td>
     <td style="color:var(--text2)">${esc(x.desc)||'-'}</td>
-    <td style="white-space:nowrap">
+    <td style="white-space:nowrap">${isViewer()?'':`
       <button class="btn btn-outline btn-sm" onclick="openModal('source',${x.id})">✏️ Ubah</button>
       <button class="btn btn-danger btn-sm" onclick="deleteItem('source',${x.id})">🗑</button>
-    </td></tr>`).join(''):emptyRow(5);
+    `}</td></tr>`).join(''):emptyRow(5);
 }
 
 function saveSource(){
+  if(!ensureCanWrite())return;
   const code=document.getElementById('source-code').value.trim().toUpperCase();
   const name=document.getElementById('source-name').value.trim();
   if(!code||!name){alert('Kode dan Nama wajib diisi');return;}
@@ -789,13 +814,14 @@ function renderAssets(){
     <td style="color:var(--text2);white-space:nowrap">${x.date||'-'}</td>
     <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap">${fmtNum(x.value)}</td>
     <td>${badge(x.status)}</td>
-    <td style="white-space:nowrap">
+    <td style="white-space:nowrap">${isViewer()?'':`
       <button class="btn btn-outline btn-sm" onclick="openModal('asset',${x.id})">✏️</button>
       <button class="btn btn-danger btn-sm" onclick="deleteItem('asset',${x.id})">🗑</button>
-    </td></tr>`).join(''):emptyRow(12);
+    `}</td></tr>`).join(''):emptyRow(12);
 }
 
 function saveAsset(){
+  if(!ensureCanWrite())return;
   const code=document.getElementById('ast-code').value.trim().toUpperCase();
   const name=document.getElementById('ast-name').value.trim();
   const typeId=document.getElementById('ast-type').value;
@@ -827,13 +853,14 @@ function renderUsers(){
     <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px">${esc(x.username)}</code></td>
     <td>${esc(x.fullname)}</td>
     <td><span class="badge ${x.role==='Administrator'?'badge-active':'badge-inactive'}">${esc(x.role)}</span></td>
-    <td style="white-space:nowrap">
+    <td style="white-space:nowrap">${isViewer()?'':`
       <button class="btn btn-outline btn-sm" onclick="openModal('user',${x.id})">✏️ Ubah</button>
       ${DB.users.length>1?`<button class="btn btn-danger btn-sm" onclick="deleteItem('user',${x.id})">🗑</button>`:''}
-    </td></tr>`).join('');
+    `}</td></tr>`).join('');
 }
 
 function saveUser(){
+  if(!ensureCanWrite())return;
   const uname=document.getElementById('usr-uname').value.trim();
   const fname=document.getElementById('usr-fname').value.trim();
   const pass=document.getElementById('usr-pass').value.trim();
@@ -845,6 +872,7 @@ function saveUser(){
 }
 
 function deleteItem(ctx,id){
+  if(!ensureCanWrite())return;
   if(ctx==='location'&&DB.assets.find(a=>a.locId==id)){alert('Tidak dapat dihapus: lokasi ini masih digunakan oleh aset.');return;}
   if(ctx==='type'&&DB.assets.find(a=>a.typeId==id)){alert('Tidak dapat dihapus: tipe ini masih digunakan oleh aset.');return;}
   if(ctx==='source'&&DB.assets.find(a=>a.sourceId==id)){alert('Tidak dapat dihapus: sumber asset ini masih digunakan oleh aset.');return;}
@@ -864,6 +892,7 @@ function deleteItem(ctx,id){
 }
 
 function openModal(ctx,id=null){
+  if(WRITE_CONTEXTS.has(ctx)&&!ensureCanWrite())return;
   editId=id;
   document.getElementById('modal-'+ctx).classList.add('open');
   if(ctx==='location'){
@@ -933,6 +962,22 @@ function getSelectedRoomName(){
   return (loc?loc.name:'SEMUA RUANGAN').toUpperCase();
 }
 
+function getSelectedFilterLabel(filterId,resolver,fallback){
+  const el=document.getElementById(filterId);
+  const val=el?el.value:'';
+  if(!val)return fallback;
+  const label=resolver(val);
+  return label&&label!=='-'?label:fallback;
+}
+
+function getAssetFilterMeta(){
+  return{
+    lokasi:getSelectedFilterLabel('filter-loc',id=>getLocName(id),'Semua Lokasi'),
+    tipe:getSelectedFilterLabel('filter-type',id=>getTypeName(id),'Semua Tipe'),
+    sumber:getSelectedFilterLabel('filter-source',id=>getSourceName(id),'Semua Sumber')
+  };
+}
+
 function getExportMerkType(x){
   const merk=(x.merk||'').trim();
   const tipe=getTypeName(x.typeId);
@@ -952,6 +997,7 @@ function printTable(){
   const rows=getFilteredAssets();
   const cetakDate=fmtTanggalLaporan();
   const roomName=getSelectedRoomName();
+  const filters=getAssetFilterMeta();
   const w=window.open('','_blank','width=1000,height=760');
   const html=`<!DOCTYPE html><html><head><title>DAFTAR BARANG RUANGAN</title>
   <style>
@@ -968,8 +1014,9 @@ function printTable(){
     .col-no{width:40px;text-align:center}
     .col-name{width:42%}
     .col-merk{width:24%}
+    .col-serial{width:140px}
     .col-jumlah{width:90px;text-align:center}
-    .col-ket{width:24%}
+    .col-ket{width:20%}
     .notice{font-size:10px;margin-top:8px}
     .sign-wrap{width:100%;margin-top:18px;border-collapse:collapse}
     .sign-wrap td{width:33.33%;text-align:center;font-size:11px;vertical-align:top}
@@ -986,12 +1033,14 @@ function printTable(){
   </table>
   <div class="title">DAFTAR BARANG RUANGAN</div>
   <div class="room">NAMA RUANGAN : ${esc(roomName)}</div>
+  <div class="room">Lokasi : ${esc(filters.lokasi)}<br>Tipe : ${esc(filters.tipe)}<br>Sumber : ${esc(filters.sumber)}</div>
   <table class="tbl">
     <thead>
       <tr>
         <th class="col-no">No</th>
         <th class="col-name">Nama Barang</th>
         <th class="col-merk">Merk/Type</th>
+        <th class="col-serial">Serial Number</th>
         <th class="col-jumlah">Jumlah Barang</th>
         <th class="col-ket">Keterangan (Digunakan oleh)</th>
       </tr>
@@ -1000,6 +1049,7 @@ function printTable(){
       <td class="col-no">${i+1}</td>
       <td>${esc(x.name)}</td>
       <td>${esc(getExportMerkType(x))}</td>
+      <td>${esc(x.serial||'-')}</td>
       <td class="col-jumlah">${esc(`${x.jumlah||1} ${x.satuan||'Buah'}`)}</td>
       <td>${esc(getExportKeterangan(x))}</td>
     </tr>`).join('')}</tbody>
@@ -1028,6 +1078,7 @@ function exportCSV(){
   const rows=getFilteredAssets();
   const cetakDate=fmtTanggalLaporan();
   const roomName=getSelectedRoomName();
+  const filters=getAssetFilterMeta();
   const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;color:#111}
     table{border-collapse:collapse;width:100%}
@@ -1047,13 +1098,15 @@ function exportCSV(){
   </table>
   <div class="title">DAFTAR BARANG RUANGAN</div>
   <div class="room">NAMA RUANGAN : ${esc(roomName)}</div>
+  <div class="room">Lokasi : ${esc(filters.lokasi)}<br>Tipe : ${esc(filters.tipe)}<br>Sumber : ${esc(filters.sumber)}</div>
   <table class="tbl">
-    <thead><tr><th class="no">No</th><th>Nama Barang</th><th>Merk/Type</th><th class="jumlah">Jumlah Barang</th><th>Keterangan (Digunakan oleh)</th></tr></thead>
+    <thead><tr><th class="no">No</th><th>Nama Barang</th><th>Merk/Type</th><th>Serial Number</th><th class="jumlah">Jumlah Barang</th><th>Keterangan (Digunakan oleh)</th></tr></thead>
     <tbody>
       ${rows.map((x,i)=>`<tr>
         <td class="no">${i+1}</td>
         <td>${esc(x.name)}</td>
         <td>${esc(getExportMerkType(x))}</td>
+        <td>${esc(x.serial||'-')}</td>
         <td class="jumlah">${esc(`${x.jumlah||1} ${x.satuan||'Buah'}`)}</td>
         <td>${esc(getExportKeterangan(x))}</td>
       </tr>`).join('')}
@@ -1070,6 +1123,71 @@ function exportCSV(){
   const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='DAFTAR_BARANG_RUANGAN_'+new Date().toISOString().slice(0,10)+'.xls';a.click();
+}
+
+function printDashboardPDF(){
+  const cetakDate=fmtTanggalLaporan();
+  const totalAssets=DB.assets.length;
+  const totalUnits=DB.assets.reduce((sum,x)=>sum+(Number(x.jumlah)||1),0);
+  const activeCount=DB.assets.filter(x=>x.status==='Aktif').length;
+  const maintCount=DB.assets.filter(x=>x.status==='Pemeliharaan').length;
+  const inactiveCount=DB.assets.filter(x=>x.status==='Tidak Aktif').length;
+  const locRows=buildGroupSummary(DB.locations,'locId',x=>x.name).filter(r=>r.assetCount>0);
+  const typeRows=buildGroupSummary(DB.types,'typeId',x=>x.name).filter(r=>r.assetCount>0);
+  const sourceRows=buildGroupSummary(DB.sources,'sourceId',x=>`${x.code} - ${x.name}`).filter(r=>r.assetCount>0);
+  const recent=[...DB.assets].reverse().slice(0,12);
+  const w=window.open('','_blank','width=1100,height=800');
+  const tableRows=(rows)=>rows.length?rows.map((r,i)=>`<tr>
+    <td>${i+1}</td><td>${esc(r.label)}</td><td style="text-align:right">${fmtNum(r.assetCount)}</td><td style="text-align:right">${fmtNum(r.unitCount)}</td>
+  </tr>`).join(''):'<tr><td colspan="4" style="text-align:center">Belum ada data aset</td></tr>';
+  const html=`<!DOCTYPE html><html><head><title>DASHBOARD ASET</title><style>
+    @page{size:A4 portrait;margin:10mm}
+    body{font-family:Arial,sans-serif;padding:18px;color:#111;font-size:11px}
+    h1{margin:0 0 6px;font-size:20px} .sub{font-size:12px;margin-bottom:14px}
+    .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+    .box{border:1px solid #333;padding:8px}
+    .lbl{font-size:10px;color:#444;margin-bottom:4px}
+    .val{font-size:18px;font-weight:700}
+    .sec{font-size:13px;font-weight:700;margin:10px 0 6px}
+    table{width:100%;border-collapse:collapse;margin-bottom:10px}
+    th,td{border:1px solid #000;padding:5px 6px;vertical-align:top}
+    th{background:#ddd;text-align:left}
+    .btn-print{padding:8px 20px;background:#1a2340;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
+    @media print{button{display:none}}
+  </style></head><body>
+    <h1>Dashboard Manajemen Asset BNNK Sleman</h1>
+    <div class="sub">Tanggal Cetak: ${cetakDate}</div>
+    <div class="stats">
+      <div class="box"><div class="lbl">Total Data Aset</div><div class="val">${fmtNum(totalAssets)}</div></div>
+      <div class="box"><div class="lbl">Total Unit Barang</div><div class="val">${fmtNum(totalUnits)}</div></div>
+      <div class="box"><div class="lbl">Aktif</div><div class="val">${fmtNum(activeCount)}</div></div>
+      <div class="box"><div class="lbl">Pemeliharaan</div><div class="val">${fmtNum(maintCount)}</div></div>
+      <div class="box"><div class="lbl">Tidak Aktif</div><div class="val">${fmtNum(inactiveCount)}</div></div>
+    </div>
+    <div class="sec">Ringkasan Per Lokasi</div>
+    <table><thead><tr><th>No</th><th>Lokasi</th><th>Aset</th><th>Unit</th></tr></thead><tbody>${tableRows(locRows)}</tbody></table>
+    <div class="sec">Ringkasan Per Tipe</div>
+    <table><thead><tr><th>No</th><th>Tipe</th><th>Aset</th><th>Unit</th></tr></thead><tbody>${tableRows(typeRows)}</tbody></table>
+    <div class="sec">Ringkasan Per Sumber</div>
+    <table><thead><tr><th>No</th><th>Sumber</th><th>Aset</th><th>Unit</th></tr></thead><tbody>${tableRows(sourceRows)}</tbody></table>
+    <div class="sec">Aset Terbaru</div>
+    <table>
+      <thead><tr><th>No</th><th>Kode</th><th>Nama Aset</th><th>Lokasi</th><th>Tipe</th><th>Sumber</th><th>Status</th></tr></thead>
+      <tbody>
+        ${recent.length?recent.map((x,i)=>`<tr>
+          <td>${i+1}</td>
+          <td>${esc(x.code)}</td>
+          <td>${esc(x.name)}</td>
+          <td>${esc(getLocName(x.locId))}</td>
+          <td>${esc(getTypeName(x.typeId))}</td>
+          <td>${esc(getSourceName(x.sourceId))}</td>
+          <td>${esc(x.status||'-')}</td>
+        </tr>`).join(''):'<tr><td colspan="7" style="text-align:center">Belum ada data aset</td></tr>'}
+      </tbody>
+    </table>
+    <button class="btn-print" onclick="window.print()">🖨️ Cetak / Simpan sebagai PDF</button>
+  </body></html>`;
+  w.document.write(html);w.document.close();
 }
 </script>
 </body>
