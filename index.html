@@ -86,6 +86,7 @@
   .input-search{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:7px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;width:200px;transition:border-color .2s}
   .input-search:focus{border-color:var(--accent)}
   .tbl-wrap{overflow-x:auto}
+  .tbl-wrap.no-x{overflow-x:visible}
   table{width:100%;border-collapse:collapse;font-size:13px}
   thead th{background:var(--surface2);padding:11px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);white-space:nowrap}
   tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
@@ -95,6 +96,12 @@
   .badge-active{background:rgba(56,217,169,.15);color:var(--accent2)}
   .badge-inactive{background:rgba(247,108,108,.15);color:var(--danger)}
   .badge-maintenance{background:rgba(245,166,35,.15);color:var(--warn)}
+  .expand-btn{width:22px;height:22px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text2);cursor:pointer;font-size:13px;line-height:1}
+  .expand-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .asset-detail-row td{background:rgba(255,255,255,.02);padding:0}
+  .asset-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px 14px}
+  .asset-detail-item{font-size:12px;color:var(--text2)}
+  .asset-detail-item b{display:block;color:var(--text);font-size:11px;letter-spacing:.6px;text-transform:uppercase;margin-bottom:2px}
   /* BUTTONS */
   .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:opacity .2s;white-space:nowrap;font-family:inherit}
   .btn:hover{opacity:.85}
@@ -115,6 +122,11 @@
   .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:32px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 40px 100px rgba(0,0,0,.7)}
   .modal-title{font-size:18px;font-weight:700;margin-bottom:24px}
   .modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}
+  #image-lightbox{display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.82);align-items:center;justify-content:center;padding:24px}
+  #image-lightbox.open{display:flex}
+  .lightbox-box{max-width:min(92vw,1200px);max-height:90vh;position:relative}
+  .lightbox-img{display:block;max-width:100%;max-height:90vh;border-radius:8px;box-shadow:0 18px 60px rgba(0,0,0,.6)}
+  .lightbox-close{position:absolute;top:-14px;right:-14px;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:#fff;font-size:20px;cursor:pointer;line-height:1}
   .empty-state{text-align:center;padding:48px 20px;color:var(--text2)}
   .empty-state .icon{font-size:40px;margin-bottom:12px}
   .data-notice{background:rgba(56,217,169,.07);border:1px solid rgba(56,217,169,.2);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--accent2);margin-bottom:20px}
@@ -346,9 +358,9 @@
             <button class="btn btn-outline" onclick="resetAssetFilters()">Reset Filter</button>
           </div>
         </div>
-        <div class="tbl-wrap">
+        <div class="tbl-wrap no-x">
           <table>
-            <thead><tr><th>#</th><th>Kode</th><th>Nama Aset</th><th>Merk</th><th>Tipe</th><th>Lokasi</th><th>Sumber</th><th>Jumlah</th><th>Tgl. Perolehan</th><th>Nilai (Rp)</th><th>Status</th><th>Aksi</th></tr></thead>
+            <thead><tr><th>#</th><th>Kode</th><th>Nama Aset</th><th>Lokasi</th><th>Status</th><th>Aksi</th></tr></thead>
             <tbody id="asset-tbody"></tbody>
           </table>
         </div>
@@ -374,6 +386,12 @@
 </div>
 
 <div id="save-indicator">💾 Menyimpan...</div>
+<div id="image-lightbox" onclick="closeImageLightbox()">
+  <div class="lightbox-box" onclick="event.stopPropagation()">
+    <button class="lightbox-close" onclick="closeImageLightbox()" title="Tutup">×</button>
+    <img id="lightbox-image" class="lightbox-img" alt="Preview Gambar Asset">
+  </div>
+</div>
 
 <!-- MODAL LOKASI -->
 <div class="modal-overlay" id="modal-location">
@@ -455,6 +473,16 @@
       <div class="form-group"><label>Tanggal Perolehan</label><input type="date" id="ast-date"></div>
       <div class="form-group"><label>Nilai Perolehan (Rp)</label><input type="number" id="ast-value" placeholder="0"></div>
     </div>
+    <div class="form-group">
+      <label>Berita Acara (Opsional)</label>
+      <input type="file" id="ast-berita-acara" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+      <div id="ast-ba-current" style="margin-top:6px;font-size:12px;color:var(--text2)">Belum ada file Berita Acara.</div>
+    </div>
+    <div class="form-group">
+      <label>Gambar Asset (Opsional)</label>
+      <input type="file" id="ast-image" accept=".jpg,.jpeg,.png,.webp,.gif">
+      <div id="ast-image-current" style="margin-top:6px;font-size:12px;color:var(--text2)">Belum ada gambar asset.</div>
+    </div>
     <div class="form-group"><label>Keterangan / Catatan</label><textarea id="ast-notes" placeholder="Tuliskan keterangan tambahan, kondisi, atau catatan penting..."></textarea></div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('asset')">Batal</button>
@@ -487,12 +515,16 @@
 <script src="bcrypt.min.js"></script>
 <script>
 const API='http://localhost:8765/api/data';
+const BERITA_UPLOAD_API='http://localhost:8765/api/upload-berita-acara';
+const IMAGE_UPLOAD_API='http://localhost:8765/api/upload-gambar-asset';
+const DELETE_FILE_API='http://localhost:8765/api/delete-file';
 const SESSION_KEY='bnn_asset_session';
 let DB=null,currentUser=null,editId=null,saveTimer=null;
 const WRITE_CONTEXTS=new Set(['location','type','source','asset','user']);
 const DEFAULT_ROWS_PER_PAGE=50;
 const TABLE_PAGERS={};
 const TABLE_FILTER_SIGNATURE={};
+const ASSET_EXPANDED={};
 const BCRYPT_ROUNDS=10;
 
 function isViewer(){
@@ -692,6 +724,21 @@ function badge(s){const m={'Aktif':'badge-active','Pemeliharaan':'badge-maintena
 function getTypeName(id){const t=DB.types.find(x=>x.id==id);return t?t.name:'-';}
 function getLocName(id){const l=DB.locations.find(x=>x.id==id);return l?l.name:'-';}
 function getSourceName(id){const s=DB.sources.find(x=>x.id==id);return s?s.name:'-';}
+function getBeritaAcaraUrl(filename){return filename?`berita-acara/${encodeURIComponent(filename)}`:'';}
+function getGambarAssetUrl(filename){return filename?`gambar-asset/${encodeURIComponent(filename)}`:'';}
+function openImageLightbox(url){
+  const overlay=document.getElementById('image-lightbox');
+  const img=document.getElementById('lightbox-image');
+  if(!overlay||!img||!url)return;
+  img.src=url;
+  overlay.classList.add('open');
+}
+function closeImageLightbox(){
+  const overlay=document.getElementById('image-lightbox');
+  const img=document.getElementById('lightbox-image');
+  if(img)img.src='';
+  if(overlay)overlay.classList.remove('open');
+}
 function nextLocationCode(){
   const maxNum=DB.locations.reduce((max,x)=>{
     const m=String(x.code||'').toUpperCase().match(/^LOC-(\d+)$/);
@@ -964,9 +1011,45 @@ function getFilteredAssets(){
   });
 }
 
+async function uploadBeritaAcara(file){
+  const formData=new FormData();
+  formData.append('file',file);
+  const r=await fetch(BERITA_UPLOAD_API,{method:'POST',body:formData});
+  const j=await r.json();
+  if(!j.ok)throw new Error(j.error||'Upload gagal');
+  return j.filename;
+}
+
+async function uploadGambarAsset(file){
+  const formData=new FormData();
+  formData.append('file',file);
+  const r=await fetch(IMAGE_UPLOAD_API,{method:'POST',body:formData});
+  const j=await r.json();
+  if(!j.ok)throw new Error(j.error||'Upload gagal');
+  return j.filename;
+}
+
+async function deleteStoredFile(type,filename){
+  if(!filename)return;
+  try{
+    await fetch(DELETE_FILE_API,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type,filename})
+    });
+  }catch(e){
+    // Ignore deletion errors to avoid blocking core delete action.
+  }
+}
+
 function resetAssetFilters(){
   const ids=['filter-status','filter-loc','filter-type','filter-source','asset-search'];
   ids.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  renderAssets();
+}
+
+function toggleAssetExpand(id){
+  ASSET_EXPANDED[id]=!ASSET_EXPANDED[id];
   renderAssets();
 }
 
@@ -984,26 +1067,37 @@ function renderAssets(){
   const filteredUnits=rows.reduce((sum,x)=>sum+(Number(x.jumlah)||1),0);
   const countInfo=document.getElementById('asset-count-info');
   if(countInfo)countInfo.textContent=`${fmtNum(rows.length)} aset • ${fmtNum(filteredUnits)} unit`;
-  document.getElementById('asset-tbody').innerHTML=paged.pageRows.length?paged.pageRows.map((x,i)=>`
-    <tr><td>${paged.start+i+1}</td>
-    <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent)">${esc(x.code)}</code></td>
-    <td><b>${esc(x.name)}</b>${x.notes?`<br><span style="font-size:11px;color:var(--text2)">${esc(x.notes.length>45?x.notes.slice(0,45)+'…':x.notes)}</span>`:''}</td>
-    <td>${esc(x.merk||'-')}</td>
-    <td>${esc(getTypeName(x.typeId))}</td>
-    <td>${esc(getLocName(x.locId))}</td>
-    <td>${esc(getSourceName(x.sourceId))}</td>
-    <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:12px">${esc(x.jumlah||1)}<br><span style="font-size:10px;color:var(--text2)">${esc(x.satuan||'Unit')}</span></td>
-    <td style="color:var(--text2);white-space:nowrap">${x.date||'-'}</td>
-    <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap">${fmtNum(x.value)}</td>
-    <td>${badge(x.status)}</td>
-    <td style="white-space:nowrap">${isViewer()?'':`
-      <button class="btn btn-outline btn-sm" onclick="openModal('asset',${x.id})">✏️</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteItem('asset',${x.id})">🗑</button>
-    `}</td></tr>`).join(''):emptyRow(12);
+  document.getElementById('asset-tbody').innerHTML=paged.pageRows.length?paged.pageRows.map((x,i)=>{
+    const open=!!ASSET_EXPANDED[x.id];
+    return `<tr>
+      <td>
+        <button class="expand-btn" onclick="toggleAssetExpand(${x.id})">${open?'-':'+'}</button>
+        <span style="margin-left:8px">${paged.start+i+1}</span>
+      </td>
+      <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent)">${esc(x.code)}</code></td>
+      <td><b>${esc(x.name)}</b>${x.notes?`<br><span style="font-size:11px;color:var(--text2)">${esc(x.notes.length>45?x.notes.slice(0,45)+'…':x.notes)}</span>`:''}</td>
+      <td>${esc(getLocName(x.locId))}</td>
+      <td>${badge(x.status)}</td>
+      <td style="white-space:nowrap">${isViewer()?'':`
+        <button class="btn btn-outline btn-sm" onclick="openModal('asset',${x.id})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteItem('asset',${x.id})">🗑</button>
+      `}${x.berita_acara_name?`<a class="btn btn-outline btn-sm" href="${esc(getBeritaAcaraUrl(x.berita_acara_name))}" target="_blank">📄 PDF</a>`:''}${x.image_name?`<button class="btn btn-outline btn-sm" data-url="${esc(getGambarAssetUrl(x.image_name))}" onclick="openImageLightbox(this.dataset.url)">🖼️ Gambar</button>`:''}</td>
+    </tr>
+    ${open?`<tr class="asset-detail-row"><td colspan="6">
+      <div class="asset-detail-grid">
+        <div class="asset-detail-item"><b>Merk</b>${esc(x.merk||'-')}</div>
+        <div class="asset-detail-item"><b>Tipe</b>${esc(getTypeName(x.typeId))}</div>
+        <div class="asset-detail-item"><b>Jumlah</b>${esc(x.jumlah||1)} ${esc(x.satuan||'Unit')}</div>
+        <div class="asset-detail-item"><b>Sumber</b>${esc(getSourceName(x.sourceId))}</div>
+        <div class="asset-detail-item"><b>Tanggal Perolehan</b>${esc(x.date||'-')}</div>
+        <div class="asset-detail-item"><b>Nilai (Rp)</b>${fmtNum(x.value)}</div>
+      </div>
+    </td></tr>`:''}`;
+  }).join(''):emptyRow(6);
   renderTableControls('asset-tbody',paged);
 }
 
-function saveAsset(){
+async function saveAsset(){
   if(!ensureCanWrite())return;
   const code=document.getElementById('ast-code').value.trim().toUpperCase();
   const name=document.getElementById('ast-name').value.trim();
@@ -1013,6 +1107,33 @@ function saveAsset(){
   if(!code||!name||!typeId||!locId||!sourceId){alert('Kode, Nama, Tipe, Lokasi, dan Sumber Asset wajib diisi');return;}
   const duplicate=DB.assets.find(a=>a.code.toUpperCase()===code&&a.id!=editId);
   if(duplicate){alert('Kode aset sudah digunakan');return;}
+  let beritaAcaraName='';
+  let imageName='';
+  if(editId){
+    const current=DB.assets.find(a=>a.id==editId);
+    beritaAcaraName=current&&current.berita_acara_name?current.berita_acara_name:'';
+    imageName=current&&current.image_name?current.image_name:'';
+  }
+  const fileInput=document.getElementById('ast-berita-acara');
+  const selectedFile=fileInput&&fileInput.files&&fileInput.files[0]?fileInput.files[0]:null;
+  const imageInput=document.getElementById('ast-image');
+  const selectedImage=imageInput&&imageInput.files&&imageInput.files[0]?imageInput.files[0]:null;
+  if(selectedFile){
+    try{
+      beritaAcaraName=await uploadBeritaAcara(selectedFile);
+    }catch(e){
+      alert(`Upload Berita Acara gagal: ${e.message}`);
+      return;
+    }
+  }
+  if(selectedImage){
+    try{
+      imageName=await uploadGambarAsset(selectedImage);
+    }catch(e){
+      alert(`Upload Gambar Asset gagal: ${e.message}`);
+      return;
+    }
+  }
   const obj={
     code,name,
     merk:document.getElementById('ast-merk').value.trim(),
@@ -1023,7 +1144,9 @@ function saveAsset(){
     status:document.getElementById('ast-status').value,
     date:document.getElementById('ast-date').value,
     value:Number(document.getElementById('ast-value').value)||0,
-    notes:document.getElementById('ast-notes').value.trim()
+    notes:document.getElementById('ast-notes').value.trim(),
+    berita_acara_name:beritaAcaraName,
+    image_name:imageName
   };
   if(editId){const x=DB.assets.find(a=>a.id==editId);Object.assign(x,obj);}
   else DB.assets.push({id:uid(),...obj});
@@ -1065,13 +1188,20 @@ async function saveUser(){
   persistDB();closeModal('user');renderUsers();
 }
 
-function deleteItem(ctx,id){
+async function deleteItem(ctx,id){
   if(!ensureCanWrite())return;
   if(ctx==='location'&&DB.assets.find(a=>a.locId==id)){alert('Tidak dapat dihapus: lokasi ini masih digunakan oleh aset.');return;}
   if(ctx==='type'&&DB.assets.find(a=>a.typeId==id)){alert('Tidak dapat dihapus: tipe ini masih digunakan oleh aset.');return;}
   if(ctx==='source'&&DB.assets.find(a=>a.sourceId==id)){alert('Tidak dapat dihapus: sumber asset ini masih digunakan oleh aset.');return;}
   if(ctx==='user'&&id==currentUser.id){alert('Tidak dapat menghapus akun Anda sendiri.');return;}
   if(!confirm('Yakin ingin menghapus data ini?'))return;
+  if(ctx==='asset'){
+    const target=DB.assets.find(x=>x.id==id);
+    if(target){
+      await deleteStoredFile('berita_acara',target.berita_acara_name);
+      await deleteStoredFile('gambar_asset',target.image_name);
+    }
+  }
   if(ctx==='location')DB.locations=DB.locations.filter(x=>x.id!=id);
   if(ctx==='type')DB.types=DB.types.filter(x=>x.id!=id);
   if(ctx==='source')DB.sources=DB.sources.filter(x=>x.id!=id);
@@ -1110,6 +1240,10 @@ function openModal(ctx,id=null){
   if(ctx==='asset'){
     document.getElementById('asset-modal-title').textContent=id?'Ubah Aset':'Tambah Aset';
     populateAssetSelects();
+    const baInfo=document.getElementById('ast-ba-current');
+    const baInput=document.getElementById('ast-berita-acara');
+    const imageInfo=document.getElementById('ast-image-current');
+    const imageInput=document.getElementById('ast-image');
     if(id){
       const x=DB.assets.find(a=>a.id==id);
       document.getElementById('ast-code').value=x.code;
@@ -1125,6 +1259,14 @@ function openModal(ctx,id=null){
       document.getElementById('ast-date').value=x.date||'';
       document.getElementById('ast-value').value=x.value||0;
       document.getElementById('ast-notes').value=x.notes||'';
+      if(baInput)baInput.value='';
+      if(imageInput)imageInput.value='';
+      if(baInfo){
+        baInfo.innerHTML=x.berita_acara_name?`File saat ini: <a href="${esc(getBeritaAcaraUrl(x.berita_acara_name))}" target="_blank">${esc(x.berita_acara_name)}</a>`:'Belum ada file Berita Acara.';
+      }
+      if(imageInfo){
+        imageInfo.innerHTML=x.image_name?`Gambar saat ini: <button class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:11px" data-url="${esc(getGambarAssetUrl(x.image_name))}" onclick="openImageLightbox(this.dataset.url)">🖼️ Lihat Gambar</button>`:'Belum ada gambar asset.';
+      }
     }else{
       ['ast-code','ast-name','ast-merk','ast-serial','ast-notes'].forEach(i=>document.getElementById(i).value='');
       document.getElementById('ast-jumlah').value=1;
@@ -1133,6 +1275,10 @@ function openModal(ctx,id=null){
       document.getElementById('ast-value').value='';
       document.getElementById('ast-source').value='';
       document.getElementById('ast-status').value='Aktif';
+      if(baInput)baInput.value='';
+      if(imageInput)imageInput.value='';
+      if(baInfo)baInfo.textContent='Belum ada file Berita Acara.';
+      if(imageInfo)imageInfo.textContent='Belum ada gambar asset.';
     }
   }
   if(ctx==='user'){
@@ -1300,14 +1446,14 @@ function exportCSV(){
   const roomName=getSelectedRoomName();
   const filters=getAssetFilterMeta();
   const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-    body{font-family:Arial,sans-serif;color:#111}
+    body{font-family:Arial,sans-serif;padding:24px 30px;color:#111;font-size:11px}
     table{border-collapse:collapse;width:100%}
-    .meta td{padding:2px 4px;font-size:12px}
-    .right{text-align:right}
-    .title{font-size:20px;font-weight:700;text-align:center;padding:10px 0 2px}
-    .subtitle{font-size:13px;font-weight:700;text-align:center;padding:0 0 8px}
-    .room{font-size:12px;padding-bottom:8px}
-    .room-meta{border-collapse:collapse;font-size:12px;margin-bottom:8px}
+    .meta{width:100%;font-size:12px;line-height:1.45}
+    .meta td{padding:0}
+    .meta .right{text-align:right;font-size:11px}
+    .title{font-size:21px;font-weight:700;text-align:center;margin:14px 0 2px}
+    .subtitle{font-size:13px;font-weight:700;text-align:center;margin:0 0 12px}
+    .room-meta{border-collapse:collapse;font-size:12px;margin-bottom:10px}
     .room-meta td{padding:0 6px 2px 0;vertical-align:top}
     .room-meta .label{min-width:120px}
     .room-meta .sep{width:10px}
