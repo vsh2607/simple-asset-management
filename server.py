@@ -10,6 +10,7 @@ import json
 import os
 import sys
 from pathlib import Path
+import mimetypes
 
 PORT = 8765
 BASE_DIR = Path(__file__).parent
@@ -47,6 +48,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 data = {}
             self.send_json(200, {"ok": True, "data": data})
         else:
+            # Serve static files from the app folder (e.g. logo.png).
+            rel = self.path.split("?", 1)[0].lstrip("/")
+            target = (BASE_DIR / rel).resolve()
+            if rel and str(target).startswith(str(BASE_DIR.resolve())) and target.is_file():
+                mime = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+                self._serve_file(target, mime)
+                return
             self.send_json(404, {"ok": False, "error": "Not found"})
 
     def do_POST(self):
