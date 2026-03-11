@@ -123,8 +123,19 @@
   .bar-track{height:7px;background:var(--border);border-radius:99px;overflow:hidden}
   .bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
   .bar-txt{font-size:10px;color:var(--text2);margin-top:3px;text-align:right}
+  .table-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface)}
+  .table-controls .left,.table-controls .right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .table-controls label,.table-controls .meta{font-size:12px;color:var(--text2)}
+  .table-controls select{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;font-family:inherit}
+  .pager-btn{background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit}
+  .pager-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .pager-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .pager-btn:disabled{opacity:.45;cursor:not-allowed}
   @media (max-width:1200px){
     .insight-grid{grid-template-columns:1fr}
+  }
+  @media (max-width:760px){
+    .table-controls{flex-direction:column;align-items:flex-start}
   }
   ::-webkit-scrollbar{width:6px}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
@@ -251,7 +262,7 @@
       <div class="card">
         <div class="card-header">
           <div class="card-title">Semua Lokasi</div>
-          <input class="input-search" placeholder="🔍 Cari lokasi..." oninput="renderLocations(this.value)">
+          <input class="input-search" id="loc-search" placeholder="🔍 Cari lokasi..." oninput="renderLocations()">
         </div>
         <div class="tbl-wrap">
           <table><thead><tr><th>#</th><th>Kode</th><th>Nama Lokasi</th><th>Keterangan</th><th>Aksi</th></tr></thead>
@@ -269,7 +280,7 @@
       <div class="card">
         <div class="card-header">
           <div class="card-title">Semua Tipe Aset</div>
-          <input class="input-search" placeholder="🔍 Cari tipe..." oninput="renderTypes(this.value)">
+          <input class="input-search" id="type-search" placeholder="🔍 Cari tipe..." oninput="renderTypes()">
         </div>
         <div class="tbl-wrap">
           <table><thead><tr><th>#</th><th>Kode</th><th>Nama Tipe</th><th>Keterangan</th><th>Aksi</th></tr></thead>
@@ -287,7 +298,7 @@
       <div class="card">
         <div class="card-header">
           <div class="card-title">Semua Sumber Asset</div>
-          <input class="input-search" placeholder="🔍 Cari sumber..." oninput="renderSources(this.value)">
+          <input class="input-search" id="source-search" placeholder="🔍 Cari sumber..." oninput="renderSources()">
         </div>
         <div class="tbl-wrap">
           <table><thead><tr><th>#</th><th>Kode</th><th>Nama Sumber</th><th>Keterangan</th><th>Aksi</th></tr></thead>
@@ -343,8 +354,10 @@
       </div>
       <div class="card">
         <div class="card-header"><div class="card-title">Semua Pengguna</div></div>
-        <table><thead><tr><th>#</th><th>Username</th><th>Nama Lengkap</th><th>Peran</th><th>Aksi</th></tr></thead>
-        <tbody id="user-tbody"></tbody></table>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>#</th><th>Username</th><th>Nama Lengkap</th><th>Peran</th><th>Aksi</th></tr></thead>
+          <tbody id="user-tbody"></tbody></table>
+        </div>
       </div>
     </div>
 
@@ -467,6 +480,9 @@ const API='http://localhost:8765/api/data';
 const SESSION_KEY='bnn_asset_session';
 let DB=null,currentUser=null,editId=null,saveTimer=null;
 const WRITE_CONTEXTS=new Set(['location','type','source','asset','user']);
+const DEFAULT_ROWS_PER_PAGE=50;
+const TABLE_PAGERS={};
+const TABLE_FILTER_SIGNATURE={};
 
 function isViewer(){
   return !!currentUser&&currentUser.role==='Viewer';
@@ -630,6 +646,92 @@ function nextLocationCode(){
 }
 function emptyRow(n){return`<tr><td colspan="${n}"><div class="empty-state"><div class="icon">📭</div><p>Belum ada data</p></div></td></tr>`;}
 
+function getTablePager(tableId){
+  if(!TABLE_PAGERS[tableId])TABLE_PAGERS[tableId]={page:1,rowsPerPage:DEFAULT_ROWS_PER_PAGE};
+  return TABLE_PAGERS[tableId];
+}
+
+function updateTableFilterSignature(tableId,signature){
+  if(TABLE_FILTER_SIGNATURE[tableId]!==signature){
+    getTablePager(tableId).page=1;
+    TABLE_FILTER_SIGNATURE[tableId]=signature;
+  }
+}
+
+function paginateRows(tableId,rows){
+  const pager=getTablePager(tableId);
+  const totalRows=rows.length;
+  const rowsPerPage=Math.max(1,Number(pager.rowsPerPage)||DEFAULT_ROWS_PER_PAGE);
+  const totalPages=Math.max(1,Math.ceil(totalRows/rowsPerPage));
+  pager.page=Math.min(Math.max(1,pager.page),totalPages);
+  const start=(pager.page-1)*rowsPerPage;
+  const pageRows=rows.slice(start,start+rowsPerPage);
+  return{pageRows,start,totalRows,rowsPerPage,totalPages,page:pager.page};
+}
+
+function rerenderTableById(tableId){
+  if(tableId==='dash-loc-summary'||tableId==='dash-type-summary'||tableId==='dash-source-summary'||tableId==='dash-recent')return renderDashboard();
+  if(tableId==='loc-tbody')return renderLocations();
+  if(tableId==='type-tbody')return renderTypes();
+  if(tableId==='source-tbody')return renderSources();
+  if(tableId==='asset-tbody')return renderAssets();
+  if(tableId==='user-tbody')return renderUsers();
+}
+
+function setTableRowsPerPage(tableId,value){
+  const pager=getTablePager(tableId);
+  pager.rowsPerPage=Number(value)||DEFAULT_ROWS_PER_PAGE;
+  pager.page=1;
+  rerenderTableById(tableId);
+}
+
+function gotoTablePage(tableId,page){
+  getTablePager(tableId).page=Number(page)||1;
+  rerenderTableById(tableId);
+}
+
+function renderTableControls(tableId,p){
+  const body=document.getElementById(tableId);
+  if(!body)return;
+  const table=body.closest('table');
+  if(!table)return;
+  const host=table.closest('.tbl-wrap')||table.parentElement;
+  const ctlId=`${tableId}-controls`;
+  let ctl=document.getElementById(ctlId);
+  if(!ctl){
+    ctl=document.createElement('div');
+    ctl.id=ctlId;
+    ctl.className='table-controls';
+    host.parentNode.insertBefore(ctl,host.nextSibling);
+  }
+  const maxButtons=5;
+  const half=Math.floor(maxButtons/2);
+  let startPage=Math.max(1,p.page-half);
+  let endPage=Math.min(p.totalPages,startPage+maxButtons-1);
+  startPage=Math.max(1,endPage-maxButtons+1);
+  const numberButtons=[];
+  for(let x=startPage;x<=endPage;x++){
+    numberButtons.push(`<button class="pager-btn ${x===p.page?'active':''}" onclick="gotoTablePage('${tableId}',${x})">${x}</button>`);
+  }
+  ctl.innerHTML=`
+    <div class="left">
+      <label>Tampilkan</label>
+      <select onchange="setTableRowsPerPage('${tableId}',this.value)">
+        <option value="10" ${p.rowsPerPage===10?'selected':''}>10</option>
+        <option value="25" ${p.rowsPerPage===25?'selected':''}>25</option>
+        <option value="50" ${p.rowsPerPage===50?'selected':''}>50</option>
+        <option value="100" ${p.rowsPerPage===100?'selected':''}>100</option>
+      </select>
+      <label>baris</label>
+      <span class="meta">${p.totalRows?`${p.start+1}-${Math.min(p.start+p.pageRows.length,p.totalRows)} dari ${p.totalRows}`:'0 data'}</span>
+    </div>
+    <div class="right">
+      <button class="pager-btn" onclick="gotoTablePage('${tableId}',${p.page-1})" ${p.page<=1?'disabled':''}>Prev</button>
+      ${numberButtons.join('')}
+      <button class="pager-btn" onclick="gotoTablePage('${tableId}',${p.page+1})" ${p.page>=p.totalPages?'disabled':''}>Next</button>
+    </div>`;
+}
+
 function buildGroupSummary(master,idKey,labelBuilder){
   const idx=new Map(master.map(m=>[m.id,{id:m.id,label:labelBuilder(m),assetCount:0,unitCount:0}]));
   DB.assets.forEach(a=>{
@@ -643,11 +745,12 @@ function buildGroupSummary(master,idKey,labelBuilder){
   return Array.from(idx.values()).sort((x,y)=>y.unitCount-x.unitCount||y.assetCount-x.assetCount||x.label.localeCompare(y.label));
 }
 
-function renderSummaryTable(tbodyId,rows,totalUnits,maxRows=10){
-  const shown=rows.filter(r=>r.assetCount>0).slice(0,maxRows);
+function renderSummaryTable(tbodyId,rows,totalUnits){
+  const shownAll=rows.filter(r=>r.assetCount>0);
+  const paged=paginateRows(tbodyId,shownAll);
   const body=document.getElementById(tbodyId);
-  if(!shown.length){body.innerHTML='<tr><td colspan="4" style="padding:14px;color:var(--text2);text-align:center">Belum ada data aset</td></tr>';return;}
-  body.innerHTML=shown.map(r=>{
+  if(!paged.pageRows.length){body.innerHTML='<tr><td colspan="4" style="padding:14px;color:var(--text2);text-align:center">Belum ada data aset</td></tr>';renderTableControls(tbodyId,paged);return;}
+  body.innerHTML=paged.pageRows.map(r=>{
     const pct=totalUnits?Math.round((r.unitCount/totalUnits)*100):0;
     return `<tr>
       <td class="insight-name">${esc(r.label)}</td>
@@ -659,6 +762,7 @@ function renderSummaryTable(tbodyId,rows,totalUnits,maxRows=10){
       </td>
     </tr>`;
   }).join('');
+  renderTableControls(tbodyId,paged);
 }
 
 function renderDashboard(){
@@ -669,11 +773,12 @@ function renderDashboard(){
   document.getElementById('stat-active').textContent=a.filter(x=>x.status==='Aktif').length;
   document.getElementById('stat-maint').textContent=a.filter(x=>x.status==='Pemeliharaan').length;
   document.getElementById('stat-inactive').textContent=a.filter(x=>x.status==='Tidak Aktif').length;
-  renderSummaryTable('dash-loc-summary',buildGroupSummary(DB.locations,'locId',x=>x.name),totalUnit,10);
-  renderSummaryTable('dash-type-summary',buildGroupSummary(DB.types,'typeId',x=>x.name),totalUnit,10);
-  renderSummaryTable('dash-source-summary',buildGroupSummary(DB.sources,'sourceId',x=>`${x.code} - ${x.name}`),totalUnit,10);
-  const recent=[...a].reverse().slice(0,8);
-  document.getElementById('dash-recent').innerHTML=recent.length?recent.map(x=>`
+  renderSummaryTable('dash-loc-summary',buildGroupSummary(DB.locations,'locId',x=>x.name),totalUnit);
+  renderSummaryTable('dash-type-summary',buildGroupSummary(DB.types,'typeId',x=>x.name),totalUnit);
+  renderSummaryTable('dash-source-summary',buildGroupSummary(DB.sources,'sourceId',x=>`${x.code} - ${x.name}`),totalUnit);
+  const recentAll=[...a].reverse();
+  const recentPaged=paginateRows('dash-recent',recentAll);
+  document.getElementById('dash-recent').innerHTML=recentPaged.pageRows.length?recentPaged.pageRows.map(x=>`
     <tr>
       <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent)">${esc(x.code)}</code></td>
       <td><b>${esc(x.name)}</b></td>
@@ -684,12 +789,16 @@ function renderDashboard(){
       <td style="font-family:'IBM Plex Mono',monospace;font-size:12px">${esc(x.jumlah||1)} ${esc(x.satuan||'Unit')}</td>
       <td>${badge(x.status)}</td>
     </tr>`).join(''):emptyRow(8);
+  renderTableControls('dash-recent',recentPaged);
 }
 
-function renderLocations(q=''){
-  const rows=DB.locations.filter(x=>!q||x.code.toLowerCase().includes(q.toLowerCase())||x.name.toLowerCase().includes(q.toLowerCase()));
-  document.getElementById('loc-tbody').innerHTML=rows.length?rows.map((x,i)=>`
-    <tr><td>${i+1}</td>
+function renderLocations(){
+  const q=(document.getElementById('loc-search')||{value:''}).value.trim().toLowerCase();
+  const rows=DB.locations.filter(x=>!q||x.code.toLowerCase().includes(q)||x.name.toLowerCase().includes(q));
+  updateTableFilterSignature('loc-tbody',q);
+  const paged=paginateRows('loc-tbody',rows);
+  document.getElementById('loc-tbody').innerHTML=paged.pageRows.length?paged.pageRows.map((x,i)=>`
+    <tr><td>${paged.start+i+1}</td>
     <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent2)">${esc(x.code)}</code></td>
     <td><b>${esc(x.name)}</b></td>
     <td style="color:var(--text2)">${esc(x.desc)||'-'}</td>
@@ -697,6 +806,7 @@ function renderLocations(q=''){
       <button class="btn btn-outline btn-sm" onclick="openModal('location',${x.id})">✏️ Ubah</button>
       <button class="btn btn-danger btn-sm" onclick="deleteItem('location',${x.id})">🗑</button>
     `}</td></tr>`).join(''):emptyRow(5);
+  renderTableControls('loc-tbody',paged);
 }
 
 function saveLocation(){
@@ -712,10 +822,13 @@ function saveLocation(){
   persistDB();closeModal('location');renderLocations();
 }
 
-function renderTypes(q=''){
-  const rows=DB.types.filter(x=>!q||x.code.toLowerCase().includes(q.toLowerCase())||x.name.toLowerCase().includes(q.toLowerCase()));
-  document.getElementById('type-tbody').innerHTML=rows.length?rows.map((x,i)=>`
-    <tr><td>${i+1}</td>
+function renderTypes(){
+  const q=(document.getElementById('type-search')||{value:''}).value.trim().toLowerCase();
+  const rows=DB.types.filter(x=>!q||x.code.toLowerCase().includes(q)||x.name.toLowerCase().includes(q));
+  updateTableFilterSignature('type-tbody',q);
+  const paged=paginateRows('type-tbody',rows);
+  document.getElementById('type-tbody').innerHTML=paged.pageRows.length?paged.pageRows.map((x,i)=>`
+    <tr><td>${paged.start+i+1}</td>
     <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--warn)">${esc(x.code)}</code></td>
     <td><b>${esc(x.name)}</b></td>
     <td style="color:var(--text2)">${esc(x.desc)||'-'}</td>
@@ -723,6 +836,7 @@ function renderTypes(q=''){
       <button class="btn btn-outline btn-sm" onclick="openModal('type',${x.id})">✏️ Ubah</button>
       <button class="btn btn-danger btn-sm" onclick="deleteItem('type',${x.id})">🗑</button>
     `}</td></tr>`).join(''):emptyRow(5);
+  renderTableControls('type-tbody',paged);
 }
 
 function saveType(){
@@ -738,10 +852,13 @@ function saveType(){
   persistDB();closeModal('type');renderTypes();
 }
 
-function renderSources(q=''){
-  const rows=DB.sources.filter(x=>!q||x.code.toLowerCase().includes(q.toLowerCase())||x.name.toLowerCase().includes(q.toLowerCase()));
-  document.getElementById('source-tbody').innerHTML=rows.length?rows.map((x,i)=>`
-    <tr><td>${i+1}</td>
+function renderSources(){
+  const q=(document.getElementById('source-search')||{value:''}).value.trim().toLowerCase();
+  const rows=DB.sources.filter(x=>!q||x.code.toLowerCase().includes(q)||x.name.toLowerCase().includes(q));
+  updateTableFilterSignature('source-tbody',q);
+  const paged=paginateRows('source-tbody',rows);
+  document.getElementById('source-tbody').innerHTML=paged.pageRows.length?paged.pageRows.map((x,i)=>`
+    <tr><td>${paged.start+i+1}</td>
     <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent2)">${esc(x.code)}</code></td>
     <td><b>${esc(x.name)}</b></td>
     <td style="color:var(--text2)">${esc(x.desc)||'-'}</td>
@@ -749,6 +866,7 @@ function renderSources(q=''){
       <button class="btn btn-outline btn-sm" onclick="openModal('source',${x.id})">✏️ Ubah</button>
       <button class="btn btn-danger btn-sm" onclick="deleteItem('source',${x.id})">🗑</button>
     `}</td></tr>`).join(''):emptyRow(5);
+  renderTableControls('source-tbody',paged);
 }
 
 function saveSource(){
@@ -799,11 +917,20 @@ function resetAssetFilters(){
 
 function renderAssets(){
   const rows=getFilteredAssets();
+  const signature=[
+    (document.getElementById('asset-search')||{value:''}).value,
+    (document.getElementById('filter-status')||{value:''}).value,
+    (document.getElementById('filter-loc')||{value:''}).value,
+    (document.getElementById('filter-type')||{value:''}).value,
+    (document.getElementById('filter-source')||{value:''}).value
+  ].join('|');
+  updateTableFilterSignature('asset-tbody',signature);
+  const paged=paginateRows('asset-tbody',rows);
   const filteredUnits=rows.reduce((sum,x)=>sum+(Number(x.jumlah)||1),0);
   const countInfo=document.getElementById('asset-count-info');
   if(countInfo)countInfo.textContent=`${fmtNum(rows.length)} aset • ${fmtNum(filteredUnits)} unit`;
-  document.getElementById('asset-tbody').innerHTML=rows.length?rows.map((x,i)=>`
-    <tr><td>${i+1}</td>
+  document.getElementById('asset-tbody').innerHTML=paged.pageRows.length?paged.pageRows.map((x,i)=>`
+    <tr><td>${paged.start+i+1}</td>
     <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent)">${esc(x.code)}</code></td>
     <td><b>${esc(x.name)}</b>${x.notes?`<br><span style="font-size:11px;color:var(--text2)">${esc(x.notes.length>45?x.notes.slice(0,45)+'…':x.notes)}</span>`:''}</td>
     <td>${esc(x.merk||'-')}</td>
@@ -818,6 +945,7 @@ function renderAssets(){
       <button class="btn btn-outline btn-sm" onclick="openModal('asset',${x.id})">✏️</button>
       <button class="btn btn-danger btn-sm" onclick="deleteItem('asset',${x.id})">🗑</button>
     `}</td></tr>`).join(''):emptyRow(12);
+  renderTableControls('asset-tbody',paged);
 }
 
 function saveAsset(){
@@ -848,15 +976,17 @@ function saveAsset(){
 }
 
 function renderUsers(){
-  document.getElementById('user-tbody').innerHTML=DB.users.map((x,i)=>`
-    <tr><td>${i+1}</td>
+  const paged=paginateRows('user-tbody',DB.users);
+  document.getElementById('user-tbody').innerHTML=paged.pageRows.length?paged.pageRows.map((x,i)=>`
+    <tr><td>${paged.start+i+1}</td>
     <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px">${esc(x.username)}</code></td>
     <td>${esc(x.fullname)}</td>
     <td><span class="badge ${x.role==='Administrator'?'badge-active':'badge-inactive'}">${esc(x.role)}</span></td>
     <td style="white-space:nowrap">${isViewer()?'':`
       <button class="btn btn-outline btn-sm" onclick="openModal('user',${x.id})">✏️ Ubah</button>
       ${DB.users.length>1?`<button class="btn btn-danger btn-sm" onclick="deleteItem('user',${x.id})">🗑</button>`:''}
-    `}</td></tr>`).join('');
+    `}</td></tr>`).join(''):emptyRow(5);
+  renderTableControls('user-tbody',paged);
 }
 
 function saveUser(){
@@ -978,6 +1108,10 @@ function getAssetFilterMeta(){
   };
 }
 
+function upperText(v){
+  return String(v||'').toUpperCase();
+}
+
 function getExportMerkType(x){
   const merk=(x.merk||'').trim();
   const tipe=getTypeName(x.typeId);
@@ -998,6 +1132,8 @@ function printTable(){
   const cetakDate=fmtTanggalLaporan();
   const roomName=getSelectedRoomName();
   const filters=getAssetFilterMeta();
+  const maxRowsPerPage=40;
+  const totalPages=Math.max(1,Math.ceil(rows.length/maxRowsPerPage));
   const w=window.open('','_blank','width=1000,height=760');
   const html=`<!DOCTYPE html><html><head><title>DAFTAR BARANG RUANGAN</title>
   <style>
@@ -1006,56 +1142,76 @@ function printTable(){
     .meta{width:100%;font-size:12px;line-height:1.45}
     .meta td{padding:0}
     .meta .right{text-align:right;font-size:11px}
-    .title{font-size:21px;font-weight:700;text-align:center;margin:14px 0 12px}
+    .title{font-size:21px;font-weight:700;text-align:center;margin:14px 0 2px}
+    .subtitle{font-size:13px;font-weight:700;text-align:center;margin:0 0 12px}
     .room{font-size:12px;margin-bottom:10px}
+    .room-meta{border-collapse:collapse;font-size:12px;margin-bottom:10px}
+    .room-meta td{padding:0 6px 2px 0;vertical-align:top}
+    .room-meta .label{min-width:120px}
+    .room-meta .sep{width:10px}
     .tbl{width:100%;border-collapse:collapse;border:1px solid #000}
     .tbl th,.tbl td{border:1px solid #000;padding:5px 6px;vertical-align:top;font-size:11px}
     .tbl th{background:#d3d3d3;font-weight:700;text-align:center}
     .col-no{width:40px;text-align:center}
-    .col-name{width:42%}
-    .col-merk{width:24%}
+    .col-name{width:28%}
+    .col-merk{width:14%}
+    .col-type{width:12%}
     .col-serial{width:140px}
     .col-jumlah{width:90px;text-align:center}
-    .col-ket{width:20%}
+    .col-ket{width:24%}
     .notice{font-size:10px;margin-top:8px}
     .sign-wrap{width:100%;margin-top:18px;border-collapse:collapse}
     .sign-wrap td{width:33.33%;text-align:center;font-size:11px;vertical-align:top}
     .sign-date{text-align:right;padding-right:6px;font-size:11px;margin-bottom:4px}
     .sign-gap{height:56px}
+    .print-page{break-after:page}
+    .print-page:last-of-type{break-after:auto}
     @media print{
       html,body{width:210mm;height:297mm}
       button{display:none}
     }
   </style></head><body>
-  <table class="meta">
-    <tr><td>NAMA UPB</td><td>: BNN KABUPATEN SLEMAN</td><td class="right">Tgl Cetak : ${cetakDate}</td></tr>
-    <tr><td>KODE UPB</td><td>:</td><td class="right">Halaman 1</td></tr>
-  </table>
-  <div class="title">DAFTAR BARANG RUANGAN</div>
-  <div class="room">NAMA RUANGAN : ${esc(roomName)}</div>
-  <div class="room">Lokasi : ${esc(filters.lokasi)}<br>Tipe : ${esc(filters.tipe)}<br>Sumber : ${esc(filters.sumber)}</div>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th class="col-no">No</th>
-        <th class="col-name">Nama Barang</th>
-        <th class="col-merk">Merk/Type</th>
-        <th class="col-serial">Serial Number</th>
-        <th class="col-jumlah">Jumlah Barang</th>
-        <th class="col-ket">Keterangan (Digunakan oleh)</th>
-      </tr>
-    </thead>
-    <tbody>${rows.map((x,i)=>`<tr>
-      <td class="col-no">${i+1}</td>
-      <td>${esc(x.name)}</td>
-      <td>${esc(getExportMerkType(x))}</td>
-      <td>${esc(x.serial||'-')}</td>
-      <td class="col-jumlah">${esc(`${x.jumlah||1} ${x.satuan||'Buah'}`)}</td>
-      <td>${esc(getExportKeterangan(x))}</td>
-    </tr>`).join('')}</tbody>
-  </table>
+  ${Array.from({length:totalPages}).map((_,pageIdx)=>{
+    const start=pageIdx*maxRowsPerPage;
+    const pageRows=rows.slice(start,start+maxRowsPerPage);
+    return `<div class="print-page">
+      <table class="meta">
+        <tr><td>NAMA UPB</td><td>: BNN KABUPATEN SLEMAN</td><td class="right">Tgl Cetak : ${cetakDate}</td></tr>
+        <tr><td>KODE UPB</td><td>:</td><td class="right">Halaman ${pageIdx+1}</td></tr>
+      </table>
+      <div class="title">DAFTAR BARANG RUANGAN</div>
+      <div class="subtitle">BARANG MILIK DAERAH</div>
+      <table class="room-meta">
+        <tr><td class="label">NAMA RUANGAN</td><td class="sep">:</td><td>${esc(upperText(roomName))}</td></tr>
+        <tr><td class="label">LOKASI</td><td class="sep">:</td><td>${esc(upperText(filters.lokasi))}</td></tr>
+        <tr><td class="label">TIPE</td><td class="sep">:</td><td>${esc(upperText(filters.tipe))}</td></tr>
+      </table>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-name">Nama Barang</th>
+            <th class="col-merk">Merk</th>
+            <th class="col-type">Type</th>
+            <th class="col-serial">Serial Number</th>
+            <th class="col-jumlah">Jumlah Barang</th>
+            <th class="col-ket">Keterangan (Digunakan oleh)</th>
+          </tr>
+        </thead>
+        <tbody>${pageRows.map((x,i)=>`<tr>
+          <td class="col-no">${start+i+1}</td>
+          <td>${esc(x.name)}</td>
+          <td>${esc((x.merk||'-').trim()||'-')}</td>
+          <td>${esc(getTypeName(x.typeId)||'-')}</td>
+          <td>${esc(x.serial||'-')}</td>
+          <td class="col-jumlah">${esc(`${x.jumlah||1} ${x.satuan||'Buah'}`)}</td>
+          <td>${esc(getExportKeterangan(x))}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('')}
   <div class="notice">Tidak dibenarkan memindahkan barang-barang yang ada pada daftar ini tanpa sepengetahuan penanggung jawab Unit Akuntansi Kuasa Pengguna Barang (UAKPB) dan penanggung jawab ruangan ini.</div>
-  <div class="sign-date">Yogyakarta, ${cetakDate}</div>
+  <div class="sign-date">Sleman, ${cetakDate}</div>
   <table class="sign-wrap">
     <tr>
       <td>Penanggung Jawab UAKPB,</td>
@@ -1084,12 +1240,22 @@ function exportCSV(){
     table{border-collapse:collapse;width:100%}
     .meta td{padding:2px 4px;font-size:12px}
     .right{text-align:right}
-    .title{font-size:20px;font-weight:700;text-align:center;padding:10px 0}
+    .title{font-size:20px;font-weight:700;text-align:center;padding:10px 0 2px}
+    .subtitle{font-size:13px;font-weight:700;text-align:center;padding:0 0 8px}
     .room{font-size:12px;padding-bottom:8px}
+    .room-meta{border-collapse:collapse;font-size:12px;margin-bottom:8px}
+    .room-meta td{padding:0 6px 2px 0;vertical-align:top}
+    .room-meta .label{min-width:120px}
+    .room-meta .sep{width:10px}
     .tbl th,.tbl td{border:1px solid #000;padding:5px 6px;font-size:11px;vertical-align:top}
     .tbl th{background:#d3d3d3;text-align:center;font-weight:700}
     .no{width:40px;text-align:center}
+    .name{width:28%}
+    .merk{width:14%}
+    .type{width:12%}
+    .serial{width:140px}
     .jumlah{width:95px;text-align:center}
+    .ket{width:24%}
     .sign td{text-align:center;font-size:11px;padding-top:8px}
   </style></head><body>
   <table class="meta">
@@ -1097,24 +1263,29 @@ function exportCSV(){
     <tr><td>KODE UPB</td><td>:</td><td class="right">Halaman 1</td></tr>
   </table>
   <div class="title">DAFTAR BARANG RUANGAN</div>
-  <div class="room">NAMA RUANGAN : ${esc(roomName)}</div>
-  <div class="room">Lokasi : ${esc(filters.lokasi)}<br>Tipe : ${esc(filters.tipe)}<br>Sumber : ${esc(filters.sumber)}</div>
+  <div class="subtitle">BARANG MILIK DAERAH</div>
+  <table class="room-meta">
+    <tr><td class="label">NAMA RUANGAN</td><td class="sep">:</td><td>${esc(upperText(roomName))}</td></tr>
+    <tr><td class="label">LOKASI</td><td class="sep">:</td><td>${esc(upperText(filters.lokasi))}</td></tr>
+    <tr><td class="label">TIPE</td><td class="sep">:</td><td>${esc(upperText(filters.tipe))}</td></tr>
+  </table>
   <table class="tbl">
-    <thead><tr><th class="no">No</th><th>Nama Barang</th><th>Merk/Type</th><th>Serial Number</th><th class="jumlah">Jumlah Barang</th><th>Keterangan (Digunakan oleh)</th></tr></thead>
+    <thead><tr><th class="no">No</th><th class="name">Nama Barang</th><th class="merk">Merk</th><th class="type">Type</th><th class="serial">Serial Number</th><th class="jumlah">Jumlah Barang</th><th class="ket">Keterangan (Digunakan oleh)</th></tr></thead>
     <tbody>
       ${rows.map((x,i)=>`<tr>
         <td class="no">${i+1}</td>
-        <td>${esc(x.name)}</td>
-        <td>${esc(getExportMerkType(x))}</td>
-        <td>${esc(x.serial||'-')}</td>
+        <td class="name">${esc(x.name)}</td>
+        <td class="merk">${esc((x.merk||'-').trim()||'-')}</td>
+        <td class="type">${esc(getTypeName(x.typeId)||'-')}</td>
+        <td class="serial">${esc(x.serial||'-')}</td>
         <td class="jumlah">${esc(`${x.jumlah||1} ${x.satuan||'Buah'}`)}</td>
-        <td>${esc(getExportKeterangan(x))}</td>
+        <td class="ket">${esc(getExportKeterangan(x))}</td>
       </tr>`).join('')}
     </tbody>
   </table>
   <div style="font-size:10px;padding-top:6px">Tidak dibenarkan memindahkan barang-barang yang ada pada daftar ini tanpa sepengetahuan penanggung jawab Unit Akuntansi Kuasa Pengguna Barang (UAKPB) dan penanggung jawab ruangan ini.</div>
   <table class="sign" style="margin-top:14px;width:100%">
-    <tr><td colspan="3" style="text-align:right;padding-right:6px">Yogyakarta, ${cetakDate}</td></tr>
+    <tr><td colspan="3" style="text-align:right;padding-right:6px">Sleman, ${cetakDate}</td></tr>
     <tr><td>Penanggung Jawab UAKPB,</td><td>Penanggung Jawab Ruangan,</td><td>Kepala BNN Kab. Sleman</td></tr>
     <tr><td style="height:58px"></td><td></td><td></td></tr>
     <tr><td>____________________</td><td>____________________</td><td>____________________</td></tr>
