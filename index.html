@@ -197,6 +197,7 @@
       <div class="nav-section">Aset</div>
       <div class="nav-item" onclick="showPage('assets')"><span class="icon">📦</span> Daftar Asset</div>
       <div class="nav-section">Pengaturan</div>
+      <div class="nav-item" onclick="showPage('variables')"><span class="icon">⚙️</span> Variable Setting</div>
       <div class="nav-item" onclick="showPage('users')"><span class="icon">👤</span> Pengguna</div>
     </nav>
     <div class="sidebar-footer">
@@ -286,8 +287,29 @@
           <input class="input-search" id="loc-search" placeholder="🔍 Cari lokasi..." oninput="renderLocations()">
         </div>
         <div class="tbl-wrap">
-          <table><thead><tr><th>#</th><th>Kode</th><th>Nama Lokasi</th><th>Keterangan</th><th>Aksi</th></tr></thead>
+          <table><thead><tr><th>#</th><th>Kode</th><th>Nama Lokasi</th><th>Penanggung Jawab</th><th>Keterangan</th><th>Aksi</th></tr></thead>
           <tbody id="loc-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VARIABLE SETTING -->
+    <div id="page-variables" class="page" style="display:none">
+      <div class="topbar">
+        <div><div class="page-title">Variable Setting</div><div class="page-sub">Kelola variable global untuk penanda tangan dan nilai lain</div></div>
+        <button class="btn btn-primary" data-write="1" onclick="openModal('variable')">+ Tambah Variable</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Daftar Variable</div>
+            <div class="card-title-sub">Gunakan key <code>uakpb_person</code> dan <code>bnn_leader</code> untuk tanda tangan cetak</div>
+          </div>
+          <input class="input-search" id="variable-search" placeholder="🔍 Cari variable..." oninput="renderVariables()">
+        </div>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>#</th><th>Key</th><th>Value</th><th>Aksi</th></tr></thead>
+          <tbody id="variable-tbody"></tbody></table>
         </div>
       </div>
     </div>
@@ -334,6 +356,7 @@
         <div><div class="page-title">Manajemen Asset BNNK Sleman</div><div class="page-sub">Tambah, ubah, dan pantau seluruh aset</div></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-outline" onclick="printTable()">🖨️ Cetak / PDF</button>
+          <button class="btn btn-outline" onclick="printAssetStickers()">🏷️ Print Sticker</button>
           <button class="btn btn-success" onclick="exportCSV()">📊 Ekspor Excel</button>
           <button class="btn btn-primary" data-write="1" onclick="openModal('asset')">+ Tambah Aset</button>
         </div>
@@ -360,7 +383,7 @@
         </div>
         <div class="tbl-wrap no-x">
           <table>
-            <thead><tr><th>#</th><th>Kode</th><th>Nama Aset</th><th>Lokasi</th><th>Status</th><th>Aksi</th></tr></thead>
+            <thead><tr><th style="width:72px"><input type="checkbox" id="asset-check-all" onchange="toggleSelectAllFiltered(this.checked)"> #</th><th>Kode</th><th>Nama Aset</th><th>Lokasi</th><th>Status</th><th>Aksi</th></tr></thead>
             <tbody id="asset-tbody"></tbody>
           </table>
         </div>
@@ -401,6 +424,7 @@
       <div class="form-group"><label>Kode Lokasi</label><input id="loc-code" placeholder="cth. LOC-016"></div>
       <div class="form-group"><label>Nama Lokasi</label><input id="loc-name" placeholder="cth. Ruang Server"></div>
     </div>
+    <div class="form-group"><label>Penanggung Jawab Ruangan</label><input id="loc-pj" placeholder="cth. Nama penanggung jawab ruangan"></div>
     <div class="form-group"><label>Keterangan</label><textarea id="loc-desc" placeholder="Keterangan opsional..."></textarea></div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('location')">Batal</button>
@@ -512,6 +536,19 @@
   </div>
 </div>
 
+<!-- MODAL VARIABLE -->
+<div class="modal-overlay" id="modal-variable">
+  <div class="modal">
+    <div class="modal-title" id="variable-modal-title">Tambah Variable</div>
+    <div class="form-group"><label>Key</label><input id="var-key" placeholder="cth. uakpb_person"></div>
+    <div class="form-group"><label>Value</label><input id="var-value" placeholder="cth. Nama lengkap"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('variable')">Batal</button>
+      <button class="btn btn-primary" onclick="saveVariable()">Simpan</button>
+    </div>
+  </div>
+</div>
+
 <script src="bcrypt.min.js"></script>
 <script>
 const API='http://localhost:8765/api/data';
@@ -520,11 +557,12 @@ const IMAGE_UPLOAD_API='http://localhost:8765/api/upload-gambar-asset';
 const DELETE_FILE_API='http://localhost:8765/api/delete-file';
 const SESSION_KEY='bnn_asset_session';
 let DB=null,currentUser=null,editId=null,saveTimer=null;
-const WRITE_CONTEXTS=new Set(['location','type','source','asset','user']);
+const WRITE_CONTEXTS=new Set(['location','type','source','asset','user','variable']);
 const DEFAULT_ROWS_PER_PAGE=50;
 const TABLE_PAGERS={};
 const TABLE_FILTER_SIGNATURE={};
 const ASSET_EXPANDED={};
+const ASSET_SELECTED={};
 const BCRYPT_ROUNDS=10;
 
 function isViewer(){
@@ -553,6 +591,20 @@ async function loadDB(){
       DB.sources=defaultSources();
       await persistDB();
     }
+    let changed=false;
+    if(!Array.isArray(DB.variableSettings)){
+      DB.variableSettings=[];
+      changed=true;
+    }
+    if(Array.isArray(DB.locations)){
+      DB.locations.forEach(loc=>{
+        if(typeof loc.personInCharge==='undefined'){
+          loc.personInCharge='';
+          changed=true;
+        }
+      });
+    }
+    if(changed)await persistDB();
     await migrateLegacyPasswords();
   }catch(e){showServerError();return false;}
   return true;
@@ -627,7 +679,8 @@ function defaultDB(){
     locations:[],
     types:[],
     sources:defaultSources(),
-    assets:[]
+    assets:[],
+    variableSettings:[]
   };
 }
 
@@ -714,6 +767,7 @@ function showPage(pg){
   if(pg==='types')renderTypes();
   if(pg==='sources')renderSources();
   if(pg==='assets'){populateFilters();renderAssets();}
+  if(pg==='variables')renderVariables();
   if(pg==='users')renderUsers();
 }
 
@@ -723,7 +777,20 @@ function fmtNum(n){return Number(n||0).toLocaleString('id-ID');}
 function badge(s){const m={'Aktif':'badge-active','Pemeliharaan':'badge-maintenance','Tidak Aktif':'badge-inactive'};return`<span class="badge ${m[s]||'badge-inactive'}">${esc(s)}</span>`;}
 function getTypeName(id){const t=DB.types.find(x=>x.id==id);return t?t.name:'-';}
 function getLocName(id){const l=DB.locations.find(x=>x.id==id);return l?l.name:'-';}
+function getLocationPersonInCharge(id){const l=DB.locations.find(x=>x.id==id);return l&&l.personInCharge?l.personInCharge:'-';}
 function getSourceName(id){const s=DB.sources.find(x=>x.id==id);return s?s.name:'-';}
+function getVariableValue(key,fallback=''){
+  const item=(DB.variableSettings||[]).find(x=>String(x.key||'').toLowerCase()===String(key||'').toLowerCase());
+  const value=item&&typeof item.value!=='undefined'?String(item.value).trim():'';
+  return value||fallback;
+}
+function getSignatoryNames(locId){
+  return{
+    uakpb:getVariableValue('uakpb_person','____________________'),
+    room:getLocationPersonInCharge(locId)==='-'?'____________________':getLocationPersonInCharge(locId),
+    leader:getVariableValue('bnn_leader','____________________')
+  };
+}
 function getBeritaAcaraUrl(filename){return filename?`berita-acara/${encodeURIComponent(filename)}`:'';}
 function getGambarAssetUrl(filename){return filename?`gambar-asset/${encodeURIComponent(filename)}`:'';}
 function openImageLightbox(url){
@@ -777,6 +844,7 @@ function rerenderTableById(tableId){
   if(tableId==='type-tbody')return renderTypes();
   if(tableId==='source-tbody')return renderSources();
   if(tableId==='asset-tbody')return renderAssets();
+  if(tableId==='variable-tbody')return renderVariables();
   if(tableId==='user-tbody')return renderUsers();
 }
 
@@ -896,18 +964,19 @@ function renderDashboard(){
 
 function renderLocations(){
   const q=(document.getElementById('loc-search')||{value:''}).value.trim().toLowerCase();
-  const rows=DB.locations.filter(x=>!q||x.code.toLowerCase().includes(q)||x.name.toLowerCase().includes(q));
+  const rows=DB.locations.filter(x=>!q||x.code.toLowerCase().includes(q)||x.name.toLowerCase().includes(q)||(x.personInCharge||'').toLowerCase().includes(q));
   updateTableFilterSignature('loc-tbody',q);
   const paged=paginateRows('loc-tbody',rows);
   document.getElementById('loc-tbody').innerHTML=paged.pageRows.length?paged.pageRows.map((x,i)=>`
     <tr><td>${paged.start+i+1}</td>
     <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent2)">${esc(x.code)}</code></td>
     <td><b>${esc(x.name)}</b></td>
+    <td>${esc(x.personInCharge)||'-'}</td>
     <td style="color:var(--text2)">${esc(x.desc)||'-'}</td>
     <td style="white-space:nowrap">${isViewer()?'':`
       <button class="btn btn-outline btn-sm" onclick="openModal('location',${x.id})">✏️ Ubah</button>
       <button class="btn btn-danger btn-sm" onclick="deleteItem('location',${x.id})">🗑</button>
-    `}</td></tr>`).join(''):emptyRow(5);
+    `}</td></tr>`).join(''):emptyRow(6);
   renderTableControls('loc-tbody',paged);
 }
 
@@ -918,10 +987,45 @@ function saveLocation(){
   if(!code||!name){alert('Kode dan Nama wajib diisi');return;}
   const duplicate=DB.locations.find(l=>l.code.toUpperCase()===code&&l.id!=editId);
   if(duplicate){alert('Kode lokasi sudah digunakan');return;}
+  const personInCharge=document.getElementById('loc-pj').value.trim();
   const desc=document.getElementById('loc-desc').value.trim();
-  if(editId){const x=DB.locations.find(l=>l.id==editId);x.code=code;x.name=name;x.desc=desc;}
-  else DB.locations.push({id:uid(),code,name,desc});
+  if(editId){const x=DB.locations.find(l=>l.id==editId);x.code=code;x.name=name;x.personInCharge=personInCharge;x.desc=desc;}
+  else DB.locations.push({id:uid(),code,name,personInCharge,desc});
   persistDB();closeModal('location');renderLocations();
+}
+
+function renderVariables(){
+  const q=(document.getElementById('variable-search')||{value:''}).value.trim().toLowerCase();
+  const rows=(DB.variableSettings||[]).filter(x=>!q||String(x.key||'').toLowerCase().includes(q)||String(x.value||'').toLowerCase().includes(q));
+  updateTableFilterSignature('variable-tbody',q);
+  const paged=paginateRows('variable-tbody',rows);
+  document.getElementById('variable-tbody').innerHTML=paged.pageRows.length?paged.pageRows.map((x,i)=>`
+    <tr><td>${paged.start+i+1}</td>
+    <td><code style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent)">${esc(x.key)}</code></td>
+    <td>${esc(x.value)||'-'}</td>
+    <td style="white-space:nowrap">${isViewer()?'':`
+      <button class="btn btn-outline btn-sm" onclick="openModal('variable',${x.id})">✏️ Ubah</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteItem('variable',${x.id})">🗑</button>
+    `}</td></tr>`).join(''):emptyRow(4);
+  renderTableControls('variable-tbody',paged);
+}
+
+function saveVariable(){
+  if(!ensureCanWrite())return;
+  const key=document.getElementById('var-key').value.trim();
+  const value=document.getElementById('var-value').value.trim();
+  if(!key||!value){alert('Key dan Value wajib diisi');return;}
+  const normalizedKey=key.toLowerCase();
+  const duplicate=(DB.variableSettings||[]).find(v=>String(v.key||'').toLowerCase()===normalizedKey&&v.id!=editId);
+  if(duplicate){alert('Key variable sudah digunakan');return;}
+  if(editId){
+    const x=(DB.variableSettings||[]).find(v=>v.id==editId);
+    x.key=key;
+    x.value=value;
+  }else{
+    DB.variableSettings.push({id:uid(),key,value});
+  }
+  persistDB();closeModal('variable');renderVariables();
 }
 
 function renderTypes(){
@@ -1065,12 +1169,15 @@ function renderAssets(){
   updateTableFilterSignature('asset-tbody',signature);
   const paged=paginateRows('asset-tbody',rows);
   const filteredUnits=rows.reduce((sum,x)=>sum+(Number(x.jumlah)||1),0);
+  const selectedCount=rows.filter(x=>!!ASSET_SELECTED[x.id]).length;
   const countInfo=document.getElementById('asset-count-info');
-  if(countInfo)countInfo.textContent=`${fmtNum(rows.length)} aset • ${fmtNum(filteredUnits)} unit`;
+  if(countInfo)countInfo.textContent=`${fmtNum(rows.length)} aset • ${fmtNum(filteredUnits)} unit • ${fmtNum(selectedCount)} dipilih`;
   document.getElementById('asset-tbody').innerHTML=paged.pageRows.length?paged.pageRows.map((x,i)=>{
     const open=!!ASSET_EXPANDED[x.id];
+    const checked=!!ASSET_SELECTED[x.id];
     return `<tr>
       <td>
+        <input type="checkbox" ${checked?'checked':''} onchange="toggleSelectAsset(${x.id},this.checked)" style="margin-right:8px;vertical-align:middle">
         <button class="expand-btn" onclick="toggleAssetExpand(${x.id})">${open?'-':'+'}</button>
         <span style="margin-left:8px">${paged.start+i+1}</span>
       </td>
@@ -1094,6 +1201,7 @@ function renderAssets(){
       </div>
     </td></tr>`:''}`;
   }).join(''):emptyRow(6);
+  syncAssetSelectAllCheckbox();
   renderTableControls('asset-tbody',paged);
 }
 
@@ -1205,13 +1313,15 @@ async function deleteItem(ctx,id){
   if(ctx==='location')DB.locations=DB.locations.filter(x=>x.id!=id);
   if(ctx==='type')DB.types=DB.types.filter(x=>x.id!=id);
   if(ctx==='source')DB.sources=DB.sources.filter(x=>x.id!=id);
-  if(ctx==='asset')DB.assets=DB.assets.filter(x=>x.id!=id);
+  if(ctx==='asset'){DB.assets=DB.assets.filter(x=>x.id!=id);delete ASSET_SELECTED[id];}
+  if(ctx==='variable')DB.variableSettings=DB.variableSettings.filter(x=>x.id!=id);
   if(ctx==='user')DB.users=DB.users.filter(x=>x.id!=id);
   persistDB();
   if(ctx==='location')renderLocations();
   if(ctx==='type')renderTypes();
   if(ctx==='source')renderSources();
   if(ctx==='asset')renderAssets();
+  if(ctx==='variable')renderVariables();
   if(ctx==='user')renderUsers();
 }
 
@@ -1221,10 +1331,10 @@ function openModal(ctx,id=null){
   document.getElementById('modal-'+ctx).classList.add('open');
   if(ctx==='location'){
     document.getElementById('loc-modal-title').textContent=id?'Ubah Lokasi':'Tambah Lokasi';
-    if(id){const x=DB.locations.find(l=>l.id==id);document.getElementById('loc-code').value=x.code;document.getElementById('loc-name').value=x.name;document.getElementById('loc-desc').value=x.desc;}
+    if(id){const x=DB.locations.find(l=>l.id==id);document.getElementById('loc-code').value=x.code;document.getElementById('loc-name').value=x.name;document.getElementById('loc-pj').value=x.personInCharge||'';document.getElementById('loc-desc').value=x.desc;}
     else{
       document.getElementById('loc-code').value=nextLocationCode();
-      ['loc-name','loc-desc'].forEach(i=>document.getElementById(i).value='');
+      ['loc-name','loc-pj','loc-desc'].forEach(i=>document.getElementById(i).value='');
     }
   }
   if(ctx==='type'){
@@ -1286,6 +1396,16 @@ function openModal(ctx,id=null){
     if(id){const x=DB.users.find(u=>u.id==id);document.getElementById('usr-uname').value=x.username;document.getElementById('usr-fname').value=x.fullname;document.getElementById('usr-pass').value='';document.getElementById('usr-role').value=x.role;}
     else{['usr-uname','usr-fname','usr-pass'].forEach(i=>document.getElementById(i).value='');}
   }
+  if(ctx==='variable'){
+    document.getElementById('variable-modal-title').textContent=id?'Ubah Variable':'Tambah Variable';
+    if(id){
+      const x=(DB.variableSettings||[]).find(v=>v.id==id);
+      document.getElementById('var-key').value=x.key;
+      document.getElementById('var-value').value=x.value;
+    }else{
+      ['var-key','var-value'].forEach(i=>document.getElementById(i).value='');
+    }
+  }
 }
 
 function closeModal(ctx){document.getElementById('modal-'+ctx).classList.remove('open');}
@@ -1337,14 +1457,148 @@ function getExportKeterangan(x){
   return sumber&&sumber!=='-'?`Sumber: ${sumber}`:'-';
 }
 
+function getSelectedAssetRows(){
+  return getFilteredAssets().filter(x=>!!ASSET_SELECTED[x.id]);
+}
+
+function isAllFilteredAssetsSelected(){
+  const rows=getFilteredAssets();
+  return rows.length>0&&rows.every(x=>!!ASSET_SELECTED[x.id]);
+}
+
+function syncAssetSelectAllCheckbox(){
+  const checkAll=document.getElementById('asset-check-all');
+  if(!checkAll)return;
+  const rows=getFilteredAssets();
+  const selectedCount=rows.filter(x=>!!ASSET_SELECTED[x.id]).length;
+  checkAll.checked=rows.length>0&&selectedCount===rows.length;
+  checkAll.indeterminate=selectedCount>0&&selectedCount<rows.length;
+}
+
+function toggleSelectAsset(id,checked){
+  if(checked)ASSET_SELECTED[id]=true;
+  else delete ASSET_SELECTED[id];
+  renderAssets();
+}
+
+function toggleSelectAllFiltered(checked){
+  const rows=getFilteredAssets();
+  rows.forEach(x=>{
+    if(checked)ASSET_SELECTED[x.id]=true;
+    else delete ASSET_SELECTED[x.id];
+  });
+  renderAssets();
+}
+
+function buildPrintRoomGroups(rows){
+  const selectedLocId=(document.getElementById('filter-loc')||{value:''}).value;
+  if(selectedLocId){
+    return [{
+      locId:selectedLocId,
+      roomName:getSelectedRoomName(),
+      lokasi:getSelectedFilterLabel('filter-loc',id=>getLocName(id),'Semua Lokasi'),
+      rows
+    }];
+  }
+  const grouped=new Map();
+  rows.forEach(row=>{
+    const key=String(row.locId||'');
+    if(!grouped.has(key))grouped.set(key,[]);
+    grouped.get(key).push(row);
+  });
+  const orderedKeys=DB.locations
+    .map(loc=>String(loc.id))
+    .filter(key=>grouped.has(key));
+  grouped.forEach((_,key)=>{
+    if(!orderedKeys.includes(key))orderedKeys.push(key);
+  });
+  if(!orderedKeys.length){
+    return [{
+      locId:'',
+      roomName:'SEMUA RUANGAN',
+      lokasi:'Semua Lokasi',
+      rows:[]
+    }];
+  }
+  return orderedKeys.map(key=>{
+    const locName=getLocName(key);
+    return {
+      locId:key,
+      roomName:upperText(locName&&locName!=='-'?locName:'Tanpa Lokasi'),
+      lokasi:locName&&locName!=='-'?locName:'Tanpa Lokasi',
+      rows:grouped.get(key)||[]
+    };
+  });
+}
+
 function printTable(){
   const rows=getFilteredAssets();
   const cetakDate=fmtTanggalLaporan();
-  const roomName=getSelectedRoomName();
+  const roomGroups=buildPrintRoomGroups(rows);
   const filters=getAssetFilterMeta();
   const maxRowsPerPage=40;
-  const totalPages=Math.max(1,Math.ceil(rows.length/maxRowsPerPage));
   const w=window.open('','_blank','width=1000,height=760');
+  const pages=roomGroups.flatMap(group=>{
+    const signatories=getSignatoryNames(group.locId);
+    const totalPages=Math.max(1,Math.ceil(group.rows.length/maxRowsPerPage));
+    return Array.from({length:totalPages}).map((_,pageIdx)=>{
+      const start=pageIdx*maxRowsPerPage;
+      const pageRows=group.rows.slice(start,start+maxRowsPerPage);
+      const isLastPage=pageIdx===totalPages-1;
+      return `<div class="print-page">
+      <table class="meta">
+        <tr><td>NAMA UPB</td><td>: BNN KABUPATEN SLEMAN</td><td class="right">Tgl Cetak : ${cetakDate}</td></tr>
+        <tr><td>KODE UPB</td><td>:</td><td class="right">Halaman ${pageIdx+1}</td></tr>
+      </table>
+      <div class="title">DAFTAR BARANG RUANGAN</div>
+      <div class="subtitle">BARANG MILIK DAERAH</div>
+      <table class="room-meta">
+        <tr><td class="label">NAMA RUANGAN</td><td class="sep">:</td><td>${esc(upperText(group.roomName))}</td></tr>
+        <tr><td class="label">LOKASI</td><td class="sep">:</td><td>${esc(upperText(group.lokasi))}</td></tr>
+        <tr><td class="label">TIPE</td><td class="sep">:</td><td>${esc(upperText(filters.tipe))}</td></tr>
+      </table>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-name">Nama Barang</th>
+            <th class="col-merk">Merk</th>
+            <th class="col-type">Type</th>
+            <th class="col-serial">Serial Number</th>
+            <th class="col-jumlah">Jumlah Barang</th>
+            <th class="col-ket">Keterangan (Digunakan oleh)</th>
+          </tr>
+        </thead>
+        <tbody>${pageRows.map((x,i)=>`<tr>
+          <td class="col-no">${start+i+1}</td>
+          <td>${esc(x.name)}</td>
+          <td>${esc((x.merk||'-').trim()||'-')}</td>
+          <td>${esc(getTypeName(x.typeId)||'-')}</td>
+          <td>${esc(x.serial||'-')}</td>
+          <td class="col-jumlah">${esc(`${x.jumlah||1} ${x.satuan||'Buah'}`)}</td>
+          <td>${esc(getExportKeterangan(x))}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+      ${isLastPage?`<div class="room-closing">
+        <div class="notice">Tidak dibenarkan memindahkan barang-barang yang ada pada daftar ini tanpa sepengetahuan penanggung jawab Unit Akuntansi Kuasa Pengguna Barang (UAKPB) dan penanggung jawab ruangan ini.</div>
+        <div class="sign-date">Sleman, ${cetakDate}</div>
+        <table class="sign-wrap">
+          <tr>
+            <td>Penanggung Jawab UAKPB,</td>
+            <td>Penanggung Jawab Ruangan,</td>
+            <td>Kepala BNN Kab. Sleman</td>
+          </tr>
+          <tr><td class="sign-gap"></td><td class="sign-gap"></td><td class="sign-gap"></td></tr>
+          <tr>
+            <td>${esc(signatories.uakpb)}</td>
+            <td>${esc(signatories.room)}</td>
+            <td>${esc(signatories.leader)}</td>
+          </tr>
+        </table>
+      </div>`:''}
+    </div>`;
+    });
+  });
   const html=`<!DOCTYPE html><html><head><title>DAFTAR BARANG RUANGAN</title>
   <style>
     @page{size:A4 portrait;margin:10mm}
@@ -1370,6 +1624,7 @@ function printTable(){
     .col-jumlah{width:90px;text-align:center}
     .col-ket{width:24%}
     .notice{font-size:10px;margin-top:8px}
+    .room-closing{break-inside:avoid-page;page-break-inside:avoid}
     .sign-wrap{width:100%;margin-top:18px;border-collapse:collapse}
     .sign-wrap td{width:33.33%;text-align:center;font-size:11px;vertical-align:top}
     .sign-date{text-align:right;padding-right:6px;font-size:11px;margin-bottom:4px}
@@ -1381,61 +1636,57 @@ function printTable(){
       button{display:none}
     }
   </style></head><body>
-  ${Array.from({length:totalPages}).map((_,pageIdx)=>{
-    const start=pageIdx*maxRowsPerPage;
-    const pageRows=rows.slice(start,start+maxRowsPerPage);
-    return `<div class="print-page">
-      <table class="meta">
-        <tr><td>NAMA UPB</td><td>: BNN KABUPATEN SLEMAN</td><td class="right">Tgl Cetak : ${cetakDate}</td></tr>
-        <tr><td>KODE UPB</td><td>:</td><td class="right">Halaman ${pageIdx+1}</td></tr>
-      </table>
-      <div class="title">DAFTAR BARANG RUANGAN</div>
-      <div class="subtitle">BARANG MILIK DAERAH</div>
-      <table class="room-meta">
-        <tr><td class="label">NAMA RUANGAN</td><td class="sep">:</td><td>${esc(upperText(roomName))}</td></tr>
-        <tr><td class="label">LOKASI</td><td class="sep">:</td><td>${esc(upperText(filters.lokasi))}</td></tr>
-        <tr><td class="label">TIPE</td><td class="sep">:</td><td>${esc(upperText(filters.tipe))}</td></tr>
-      </table>
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th class="col-no">No</th>
-            <th class="col-name">Nama Barang</th>
-            <th class="col-merk">Merk</th>
-            <th class="col-type">Type</th>
-            <th class="col-serial">Serial Number</th>
-            <th class="col-jumlah">Jumlah Barang</th>
-            <th class="col-ket">Keterangan (Digunakan oleh)</th>
-          </tr>
-        </thead>
-        <tbody>${pageRows.map((x,i)=>`<tr>
-          <td class="col-no">${start+i+1}</td>
-          <td>${esc(x.name)}</td>
-          <td>${esc((x.merk||'-').trim()||'-')}</td>
-          <td>${esc(getTypeName(x.typeId)||'-')}</td>
-          <td>${esc(x.serial||'-')}</td>
-          <td class="col-jumlah">${esc(`${x.jumlah||1} ${x.satuan||'Buah'}`)}</td>
-          <td>${esc(getExportKeterangan(x))}</td>
-        </tr>`).join('')}</tbody>
-      </table>
-    </div>`;
-  }).join('')}
-  <div class="notice">Tidak dibenarkan memindahkan barang-barang yang ada pada daftar ini tanpa sepengetahuan penanggung jawab Unit Akuntansi Kuasa Pengguna Barang (UAKPB) dan penanggung jawab ruangan ini.</div>
-  <div class="sign-date">Sleman, ${cetakDate}</div>
-  <table class="sign-wrap">
-    <tr>
-      <td>Penanggung Jawab UAKPB,</td>
-      <td>Penanggung Jawab Ruangan,</td>
-      <td>Kepala BNN Kab. Sleman</td>
-    </tr>
-    <tr><td class="sign-gap"></td><td class="sign-gap"></td><td class="sign-gap"></td></tr>
-    <tr>
-      <td>____________________</td>
-      <td>____________________</td>
-      <td>____________________</td>
-    </tr>
-  </table>
+  ${pages.join('')}
   <br><button onclick="window.print()" style="padding:8px 20px;background:#1a2340;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Cetak / Simpan sebagai PDF</button>
+  </body></html>`;
+  w.document.write(html);w.document.close();
+}
+
+function printAssetStickers(){
+  const rows=getSelectedAssetRows();
+  if(!rows.length){
+    alert('Pilih minimal satu aset untuk cetak sticker.');
+    return;
+  }
+  const w=window.open('','_blank','width=1000,height=760');
+  const html=`<!DOCTYPE html><html><head><title>STICKER ASET</title>
+  <style>
+    @page{size:A4 portrait;margin:10mm}
+    body{font-family:Arial,sans-serif;padding:0;color:#111}
+    .sheet{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10mm}
+    .sticker{width:100%;border-collapse:collapse;table-layout:fixed;break-inside:avoid-page;page-break-inside:avoid}
+    .sticker td{border:1px solid #000;padding:6px 8px;vertical-align:top}
+    .logo-cell{width:62px;text-align:center;vertical-align:middle}
+    .logo{width:42px;height:42px;object-fit:contain;display:block;margin:0 auto}
+    .content-cell{padding:0}
+    .content-table{width:100%;border-collapse:collapse;table-layout:fixed}
+    .content-table td{border:1px solid #000;padding:6px 8px}
+    .content-table tr:first-child td{border-top:none}
+    .content-table tr:last-child td{border-bottom:none}
+    .content-table td:first-child{border-left:none}
+    .content-table td:last-child{border-right:none}
+    .code-room{font-size:13px;font-weight:700;line-height:1.3}
+    .asset-name{font-size:12px;font-weight:700}
+    .asset-note{font-size:11px;line-height:1.35}
+    .asset-note.empty{color:#555}
+    .actions{margin-top:16px}
+    @media print{button{display:none}}
+  </style></head><body>
+  <div class="sheet">
+    ${rows.map(x=>`<table class="sticker">
+      <tr>
+        <td class="logo-cell"><img class="logo" src="logo.png" alt="Logo BNNK Sleman"></td>
+        <td class="content-cell">
+          <table class="content-table">
+            <tr><td class="code-room">${esc(x.code)} - ${esc(getLocName(x.locId))}</td></tr>
+            <tr><td class="asset-name">${esc(x.name)}</td></tr>
+            <tr><td class="asset-note ${getExportKeterangan(x)==='-'?'empty':''}">${esc(getExportKeterangan(x)==='-'?'Belum ada catatan penggunaan':getExportKeterangan(x))}</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>`).join('')}
+  </div>
+  <div class="actions"><button onclick="window.print()" style="padding:8px 20px;background:#1a2340;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Cetak Sticker</button></div>
   </body></html>`;
   w.document.write(html);w.document.close();
 }
@@ -1443,8 +1694,8 @@ function printTable(){
 function exportCSV(){
   const rows=getFilteredAssets();
   const cetakDate=fmtTanggalLaporan();
-  const roomName=getSelectedRoomName();
   const filters=getAssetFilterMeta();
+  const roomGroups=buildPrintRoomGroups(rows);
   const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:Arial,sans-serif;padding:24px 30px;color:#111;font-size:11px}
     table{border-collapse:collapse;width:100%}
@@ -1466,8 +1717,12 @@ function exportCSV(){
     .serial{width:140px}
     .jumlah{width:95px;text-align:center}
     .ket{width:24%}
+    .group{margin-bottom:28px}
     .sign td{text-align:center;font-size:11px;padding-top:8px}
   </style></head><body>
+  ${roomGroups.map(group=>{
+    const signatories=getSignatoryNames(group.locId);
+    return `<div class="group">
   <table class="meta">
     <tr><td>NAMA UPB</td><td>: BNN KABUPATEN SLEMAN</td><td class="right">Tgl Cetak : ${cetakDate}</td></tr>
     <tr><td>KODE UPB</td><td>:</td><td class="right">Halaman 1</td></tr>
@@ -1475,14 +1730,14 @@ function exportCSV(){
   <div class="title">DAFTAR BARANG RUANGAN</div>
   <div class="subtitle">BARANG MILIK DAERAH</div>
   <table class="room-meta">
-    <tr><td class="label">NAMA RUANGAN</td><td class="sep">:</td><td>${esc(upperText(roomName))}</td></tr>
-    <tr><td class="label">LOKASI</td><td class="sep">:</td><td>${esc(upperText(filters.lokasi))}</td></tr>
+    <tr><td class="label">NAMA RUANGAN</td><td class="sep">:</td><td>${esc(upperText(group.roomName))}</td></tr>
+    <tr><td class="label">LOKASI</td><td class="sep">:</td><td>${esc(upperText(group.lokasi))}</td></tr>
     <tr><td class="label">TIPE</td><td class="sep">:</td><td>${esc(upperText(filters.tipe))}</td></tr>
   </table>
   <table class="tbl">
     <thead><tr><th class="no">No</th><th class="name">Nama Barang</th><th class="merk">Merk</th><th class="type">Type</th><th class="serial">Serial Number</th><th class="jumlah">Jumlah Barang</th><th class="ket">Keterangan (Digunakan oleh)</th></tr></thead>
     <tbody>
-      ${rows.map((x,i)=>`<tr>
+      ${group.rows.map((x,i)=>`<tr>
         <td class="no">${i+1}</td>
         <td class="name">${esc(x.name)}</td>
         <td class="merk">${esc((x.merk||'-').trim()||'-')}</td>
@@ -1498,8 +1753,10 @@ function exportCSV(){
     <tr><td colspan="3" style="text-align:right;padding-right:6px">Sleman, ${cetakDate}</td></tr>
     <tr><td>Penanggung Jawab UAKPB,</td><td>Penanggung Jawab Ruangan,</td><td>Kepala BNN Kab. Sleman</td></tr>
     <tr><td style="height:58px"></td><td></td><td></td></tr>
-    <tr><td>____________________</td><td>____________________</td><td>____________________</td></tr>
+    <tr><td>${esc(signatories.uakpb)}</td><td>${esc(signatories.room)}</td><td>${esc(signatories.leader)}</td></tr>
   </table>
+  </div>`;
+  }).join('')}
   </body></html>`;
   const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
