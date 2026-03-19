@@ -13,6 +13,7 @@ from pathlib import Path
 import mimetypes
 import re
 from datetime import datetime
+from urllib.parse import parse_qs, urlparse
 
 PORT = 8765
 BASE_DIR = Path(__file__).parent
@@ -20,6 +21,7 @@ DATA_FILE = BASE_DIR / "data.json"
 HTML_FILE = BASE_DIR / "index.html"
 BERITA_DIR = BASE_DIR / "berita-acara"
 GAMBAR_DIR = BASE_DIR / "gambar-asset"
+DOKUMEN_DIR = BASE_DIR / "dokumen"
 
 class Handler(http.server.BaseHTTPRequestHandler):
 
@@ -43,7 +45,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        clean_path = self.path.split("?", 1)[0]
+        parsed = urlparse(self.path)
+        clean_path = parsed.path
         if clean_path in ("/", "/index.html"):
             self._serve_file(HTML_FILE, "text/html")
         elif clean_path in ("/api/data", "/api/data/"):
@@ -63,7 +66,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json(404, {"ok": False, "error": "Not found"})
 
     def do_POST(self):
-        clean_path = self.path.split("?", 1)[0]
+        parsed = urlparse(self.path)
+        clean_path = parsed.path
+        query = parse_qs(parsed.query)
         if clean_path in ("/api/data", "/api/data/"):
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length)
@@ -78,6 +83,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._handle_upload_berita_acara()
         elif clean_path in ("/api/upload-gambar-asset", "/api/upload-gambar-asset/"):
             self._handle_upload_gambar_asset()
+        elif clean_path in ("/api/upload-dokumen", "/api/upload-dokumen/"):
+            self._handle_upload_dokumen(query)
         elif clean_path in ("/api/delete-file", "/api/delete-file/"):
             self._handle_delete_file()
         else:
@@ -89,7 +96,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def _handle_upload_gambar_asset(self):
         self._handle_upload_file(GAMBAR_DIR, "gambar_asset")
 
-    def _handle_upload_file(self, target_dir: Path, fallback_stem: str):
+    def _handle_upload_dokumen(self, query):
+        folder_id = (query.get("folder_id") or [""])[0].strip()
+        if not folder_id:
+            self.send_json(400, {"ok": False, "error": "folder_id is required"})
+            return
+        safe_folder = re.sub(r"[^A-Za-z0-9_-]+", "_", folder_id).strip("_")
+        if not safe_folder:
+            self.send_json(400, {"ok": False, "error": "Invalid folder_id"})
+            return
+        self._handle_upload_file(DOKUMEN_DIR / safe_folder, "dokumen", response_prefix=f"{safe_folder}/")
+
+    def _handle_upload_file(self, target_dir: Path, fallback_stem: str, response_prefix: str = ""):
         try:
             ctype = self.headers.get("Content-Type", "")
             if "multipart/form-data" not in ctype:
@@ -166,7 +184,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json(200, {
                 "ok": True,
                 "filename": generated_name,
-                "original_name": original_name
+                "original_name": original_name,
+                "stored_path": f"{response_prefix}{generated_name}" if response_prefix else generated_name
             })
         except Exception as e:
             self.send_json(500, {"ok": False, "error": str(e)})
@@ -177,16 +196,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             payload = json.loads(body or b"{}")
             file_type = (payload.get("type") or "").strip().lower()
-            filename = Path(payload.get("filename") or "").name
-
-            if not filename:
+            raw_filename = str(payload.get("filename") or "").strip()
+            if not raw_filename:
                 self.send_json(400, {"ok": False, "error": "filename is required"})
                 return
 
             if file_type == "berita_acara":
                 base_dir = BERITA_DIR
+                filename = Path(raw_filename).name
             elif file_type == "gambar_asset":
                 base_dir = GAMBAR_DIR
+                filename = Path(raw_filename).name
+            elif file_type == "document":
+                base_dir = DOKUMEN_DIR
+                filename = raw_filename.replace("\\", "/").lstrip("/")
             else:
                 self.send_json(400, {"ok": False, "error": "Invalid file type"})
                 return
