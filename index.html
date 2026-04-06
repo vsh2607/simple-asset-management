@@ -173,6 +173,8 @@
   .monitoring-view{display:none}
   .monitoring-view.open{display:block}
   .monitoring-inline-actions{display:flex;gap:10px;flex-wrap:wrap}
+  .monitoring-toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
+  .monitoring-toolbar .form-group{min-width:220px;flex:1 1 220px}
   .report-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface)}
   .report-summary-card{border-right:1px solid var(--border);background:var(--surface)}
   .report-summary-card:last-child{border-right:none}
@@ -193,9 +195,11 @@
   .report-preview-table th,.report-preview-table td{border:1px solid var(--border);padding:8px 8px;vertical-align:top}
   .report-preview-table th{background:#233f67;color:#fff;text-align:center}
   .report-preview-table td{background:rgba(255,255,255,.02)}
+  .report-group-row td{background:rgba(35,63,103,.08)!important;font-weight:700;color:var(--text);border-top:2px solid var(--border)}
   .report-kondisi-good{background:rgba(56,217,169,.12)!important;color:var(--accent2);font-weight:700;text-align:center}
   .report-kondisi-light{background:rgba(245,166,35,.12)!important;color:var(--warn);font-weight:700;text-align:center}
   .report-kondisi-heavy{background:rgba(247,108,108,.12)!important;color:var(--danger);font-weight:700;text-align:center}
+  .report-filter-note{font-size:12px;color:var(--text2);margin-bottom:12px}
   .report-signature-date{text-align:right;font-size:12px;margin-top:18px;margin-bottom:6px}
   .report-signature-table{width:100%;border-collapse:collapse;margin-top:8px}
   .report-signature-table td{width:50%;text-align:center;padding:4px 6px;vertical-align:top;border:none!important;background:transparent!important}
@@ -533,6 +537,21 @@
             </div>
           </div>
           <div class="monitoring-note">Form ini menampilkan aset saat ini. Saat disimpan, snapshot monitoring akan disimpan dan kondisi aset utama ikut diperbarui.</div>
+          <div class="monitoring-toolbar" style="margin-top:14px">
+            <div class="form-group">
+              <label>Filter Lokasi</label>
+              <select id="monitoring-location-filter" onchange="renderAssetMonitoringAssetRows(getMonitoringById(monitoringEditId))">
+                <option value="">Semua Lokasi</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Group By</label>
+              <select id="monitoring-group-by" onchange="renderAssetMonitoringAssetRows(getMonitoringById(monitoringEditId))">
+                <option value="location">Lokasi</option>
+                <option value="none">Tanpa Grouping</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
       <div class="card">
@@ -620,7 +639,26 @@
             <div class="card-title">Pilih Laporan Monitoring</div>
             <div class="card-title-sub" id="monitoring-report-count-info">0 laporan tersedia</div>
           </div>
-          <select class="input-search" id="monitoring-report-select" style="width:360px" onchange="renderMonitoringReport()"></select>
+          <select class="input-search" id="monitoring-report-select" style="width:360px" onchange="handleMonitoringReportSelectionChange()"></select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <div class="monitoring-toolbar">
+            <div class="form-group">
+              <label>Filter Lokasi</label>
+              <select id="monitoring-report-location-filter" onchange="renderMonitoringReport()">
+                <option value="">Semua Lokasi</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Group By</label>
+              <select id="monitoring-report-group-by" onchange="renderMonitoringReport()">
+                <option value="location">Lokasi</option>
+                <option value="none">Tanpa Grouping</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
       <div class="card">
@@ -892,6 +930,8 @@ let DB=null,currentUser=null,editId=null,saveTimer=null;
 let editDocumentFolderId=null;
 let attachmentModalState=null;
 let selectedMonitoringReportId=null;
+let selectedMonitoringReportLocationFilter='';
+let selectedMonitoringReportGroupBy='location';
 let monitoringEditId=null;
 let monitoringViewMode='index';
 const WRITE_CONTEXTS=new Set(['location','type','source','asset','user','variable','document-folder','document-upload']);
@@ -1017,8 +1057,13 @@ async function loadDB(){
         tahun:item&&item.tahun?Number(item.tahun):Number(new Date().getFullYear()),
         tanggalPengecekan:item&&item.tanggalPengecekan?String(item.tanggalPengecekan):todayISO(),
         kodeLaporan:item&&item.kodeLaporan?String(item.kodeLaporan):buildMonitoringCode(item&&item.tanggalPengecekan?String(item.tanggalPengecekan):todayISO()),
+        locationFilterId:item&&item.locationFilterId!==null&&typeof item.locationFilterId!=='undefined'&&item.locationFilterId!==''&&Number.isFinite(Number(item.locationFilterId))?Number(item.locationFilterId):null,
+        groupBy:item&&item.groupBy?String(item.groupBy):'location',
         createdAt:item&&item.createdAt?String(item.createdAt):new Date().toISOString(),
-        items:Array.isArray(item&&item.items)?item.items:[]
+        items:Array.isArray(item&&item.items)?item.items.map(entry=>({
+          ...entry,
+          lokasiId:entry&&entry.lokasiId!==null&&typeof entry.lokasiId!=='undefined'&&entry.lokasiId!==''&&Number.isFinite(Number(entry.lokasiId))?Number(entry.lokasiId):null
+        })):[]
       }));
       if(JSON.stringify(normalizedMonitorings)!==JSON.stringify(DB.assetConditionMonitorings)){
         DB.assetConditionMonitorings=normalizedMonitorings;
@@ -1257,6 +1302,10 @@ function getLocationFilterIds(rawLocId){
   if(!Number.isFinite(locId))return [];
   return getLocationScopeIds(locId);
 }
+function getLocationOptionLabel(location){
+  if(!location)return '-';
+  return `${location.name}${locationHasChildren(location.id)?' (dengan turunan)':''}`;
+}
 function assetMatchesLocationFilter(assetLocId,filterLocId){
   if(!filterLocId)return true;
   return getLocationFilterIds(filterLocId).includes(Number(assetLocId));
@@ -1298,6 +1347,13 @@ function getAssetImageFiles(asset){
 }
 function buildConditionOptions(selected){
   return ASSET_CONDITION_OPTIONS.map(option=>`<option value="${option}" ${String(selected||'Baik')===option?'selected':''}>${option}</option>`).join('');
+}
+function populateLocationSelect(selectId,placeholder='Semua Lokasi'){
+  const el=document.getElementById(selectId);
+  if(!el)return;
+  const currentValue=el.value;
+  el.innerHTML=`<option value="">${esc(placeholder)}</option>`+DB.locations.map(loc=>`<option value="${loc.id}">${esc(getLocationOptionLabel(loc))}</option>`).join('');
+  if(currentValue&&Array.from(el.options).some(option=>option.value===String(currentValue)))el.value=String(currentValue);
 }
 function buildMonitoringCode(dateValue,ignoreId=null){
   const targetDate=String(dateValue||todayISO());
@@ -1816,19 +1872,71 @@ function resetAssetMonitoringForm(report=null){
   const yearEl=document.getElementById('monitoring-year');
   const dateEl=document.getElementById('monitoring-date');
   const codeEl=document.getElementById('monitoring-code');
+  const locFilterEl=document.getElementById('monitoring-location-filter');
+  const groupByEl=document.getElementById('monitoring-group-by');
+  populateLocationSelect('monitoring-location-filter');
   if(periodEl)periodEl.value=report&&report.periode?report.periode:'Triwulan I';
   if(yearEl)yearEl.value=report&&report.tahun?String(report.tahun):year;
   if(dateEl)dateEl.value=report&&report.tanggalPengecekan?report.tanggalPengecekan:date;
   if(codeEl)codeEl.value=report&&report.kodeLaporan?report.kodeLaporan:buildMonitoringCode(date,monitoringEditId);
+  if(locFilterEl)locFilterEl.value=report&&report.locationFilterId!==null&&typeof report.locationFilterId!=='undefined'?String(report.locationFilterId):'';
+  if(groupByEl)groupByEl.value=report&&report.groupBy?String(report.groupBy):'location';
+}
+function getMonitoringFormFilterValue(){
+  return (document.getElementById('monitoring-location-filter')||{value:''}).value;
+}
+function getMonitoringFormGroupByValue(){
+  return (document.getElementById('monitoring-group-by')||{value:'location'}).value||'location';
+}
+function getMonitoringFormAssets(){
+  const filterLocId=getMonitoringFormFilterValue();
+  return (DB.assets||[])
+    .filter(asset=>assetMatchesLocationFilter(asset.locId,filterLocId))
+    .sort((a,b)=>getLocName(a.locId).localeCompare(getLocName(b.locId))||String(a.name||'').localeCompare(String(b.name||''))||String(a.code||'').localeCompare(String(b.code||'')));
+}
+function getMonitoringDraftItemsFromDom(){
+  const map=new Map();
+  (DB.assets||[]).forEach(asset=>{
+    const kondisiEl=document.getElementById(`monitoring-kondisi-${asset.id}`);
+    const keteranganEl=document.getElementById(`monitoring-keterangan-${asset.id}`);
+    if(!kondisiEl&&!keteranganEl)return;
+    map.set(Number(asset.id),{
+      kondisi:(kondisiEl&&kondisiEl.value)||asset.kondisi||'Baik',
+      keterangan:(keteranganEl&&keteranganEl.value)||''
+    });
+  });
+  return map;
+}
+function getMonitoringRowsGroupedByLocation(rows){
+  const orderedIds=getOrderedLocationIdsForRows(rows);
+  const grouped=new Map();
+  rows.forEach(row=>{
+    const key=String(row.locId||'');
+    if(!grouped.has(key))grouped.set(key,{label:getLocName(row.locId)||'Tanpa Lokasi',rows:[]});
+    grouped.get(key).rows.push(row);
+  });
+  const groups=orderedIds.filter(id=>grouped.has(String(id))).map(id=>grouped.get(String(id)));
+  Array.from(grouped.entries()).forEach(([key,group])=>{
+    if(!orderedIds.includes(String(key)))groups.push(group);
+  });
+  return groups;
 }
 function renderAssetMonitoringAssetRows(report=null){
-  const rows=DB.assets||[];
+  const rows=getMonitoringFormAssets();
   const body=document.getElementById('monitoring-asset-tbody');
   const countInfo=document.getElementById('monitoring-asset-count-info');
   const itemMap=getMonitoringItemsByAssetId(report);
-  if(countInfo)countInfo.textContent=`${fmtNum(rows.length)} aset • ${fmtNum(rows.reduce((sum,item)=>sum+(Number(item.jumlah)||1),0))} unit`;
+  const draftMap=getMonitoringDraftItemsFromDom();
+  const filterLocId=getMonitoringFormFilterValue();
+  const groupBy=getMonitoringFormGroupByValue();
+  const filterLabel=filterLocId?getLocationOptionLabel(getLocationById(filterLocId)):'Semua Lokasi';
+  if(countInfo)countInfo.textContent=`${fmtNum(rows.length)} aset • ${fmtNum(rows.reduce((sum,item)=>sum+(Number(item.jumlah)||1),0))} unit • ${filterLabel}`;
   if(!body)return;
-  body.innerHTML=rows.length?rows.map((asset,idx)=>`
+  if(!rows.length){
+    body.innerHTML=emptyRow(8);
+    return;
+  }
+  const renderRow=(asset,idx)=>`
     <tr>
       <td>${idx+1}</td>
       <td><b>${esc(asset.name||'-')}</b><br><span class="file-meta">${esc(asset.code||'-')}</span></td>
@@ -1838,12 +1946,23 @@ function renderAssetMonitoringAssetRows(report=null){
       <td>${fmtNum(asset.jumlah||1)} ${esc(asset.satuan||'Unit')}</td>
       <td>
         <select id="monitoring-kondisi-${asset.id}">
-          ${buildConditionOptions((itemMap.get(Number(asset.id))||{}).kondisi||asset.kondisi||'Baik')}
+          ${buildConditionOptions((draftMap.get(Number(asset.id))||itemMap.get(Number(asset.id))||{}).kondisi||asset.kondisi||'Baik')}
         </select>
       </td>
-      <td><input id="monitoring-keterangan-${asset.id}" placeholder="Keterangan pengecekan" value="${esc((itemMap.get(Number(asset.id))||{}).keterangan||'')}"></td>
+      <td><input id="monitoring-keterangan-${asset.id}" placeholder="Keterangan pengecekan" value="${esc((draftMap.get(Number(asset.id))||itemMap.get(Number(asset.id))||{}).keterangan||'')}"></td>
     </tr>
-  `).join(''):emptyRow(8);
+  `;
+  if(groupBy!=='location'){
+    body.innerHTML=rows.map((asset,idx)=>renderRow(asset,idx)).join('');
+    return;
+  }
+  let runningIndex=0;
+  body.innerHTML=getMonitoringRowsGroupedByLocation(rows).map(group=>{
+    const totalUnits=group.rows.reduce((sum,item)=>sum+(Number(item.jumlah)||1),0);
+    const groupHeader=`<tr class="report-group-row"><td colspan="8">Lokasi: ${esc(group.label)} • ${fmtNum(group.rows.length)} aset • ${fmtNum(totalUnits)} unit</td></tr>`;
+    const items=group.rows.map(asset=>renderRow(asset,runningIndex++)).join('');
+    return groupHeader+items;
+  }).join('');
 }
 function getSortedMonitoringRows(){
   return [...(DB.assetConditionMonitorings||[])].sort((a,b)=>String(b.tanggalPengecekan||'').localeCompare(String(a.tanggalPengecekan||''))||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
@@ -1913,7 +2032,7 @@ function openAssetMonitoringDetail(id){
   monitoringEditId=id;
   const preview=document.getElementById('monitoring-detail-preview');
   const titleSub=document.getElementById('monitoring-detail-title-sub');
-  if(preview)preview.innerHTML=buildMonitoringReportDocument(report);
+  if(preview)preview.innerHTML=buildMonitoringReportDocument(report,{locationFilterId:report.locationFilterId,groupBy:report.groupBy||'location'});
   if(titleSub)titleSub.textContent=`${report.kodeLaporan||'-'} • ${report.periode||'-'} ${report.tahun||'-'} • ${report.tanggalPengecekan||'-'}`;
   switchAssetMonitoringView('detail');
 }
@@ -1938,6 +2057,9 @@ async function saveAssetMonitoring(){
   const tahun=Number((document.getElementById('monitoring-year')||{value:''}).value);
   const tanggalPengecekan=(document.getElementById('monitoring-date')||{value:''}).value||todayISO();
   const kodeLaporan=(document.getElementById('monitoring-code')||{value:''}).value||buildMonitoringCode(tanggalPengecekan,monitoringEditId);
+  const locationFilterIdRaw=getMonitoringFormFilterValue();
+  const locationFilterId=locationFilterIdRaw?Number(locationFilterIdRaw):null;
+  const groupBy=getMonitoringFormGroupByValue();
   if(!periode||!tahun||!tanggalPengecekan){
     alert('Periode, tahun, dan tanggal pengecekan wajib diisi.');
     return;
@@ -1949,7 +2071,12 @@ async function saveAssetMonitoring(){
   }
   const wasEdit=monitoringEditId!==null;
   let savedId=monitoringEditId;
-  const items=(DB.assets||[]).map(asset=>{
+  const filteredAssets=getMonitoringFormAssets();
+  if(!filteredAssets.length){
+    alert('Tidak ada aset yang sesuai dengan filter lokasi monitoring.');
+    return;
+  }
+  const items=filteredAssets.map(asset=>{
     const kondisiEl=document.getElementById(`monitoring-kondisi-${asset.id}`);
     const keteranganEl=document.getElementById(`monitoring-keterangan-${asset.id}`);
     const kondisi=(kondisiEl&&kondisiEl.value)||asset.kondisi||'Baik';
@@ -1960,6 +2087,7 @@ async function saveAssetMonitoring(){
       kodeAsset:asset.code||'',
       nama:asset.name||'',
       merek:asset.merk||'',
+      lokasiId:Number(asset.locId)||null,
       lokasi:getLocName(asset.locId),
       pengguna:asset.notes||'',
       jumlah:Number(asset.jumlah)||1,
@@ -1975,6 +2103,8 @@ async function saveAssetMonitoring(){
       target.tahun=tahun;
       target.tanggalPengecekan=tanggalPengecekan;
       target.kodeLaporan=kodeLaporan;
+      target.locationFilterId=locationFilterId;
+      target.groupBy=groupBy;
       target.items=items;
     }
   }else{
@@ -1985,6 +2115,8 @@ async function saveAssetMonitoring(){
       tahun,
       tanggalPengecekan,
       kodeLaporan,
+      locationFilterId,
+      groupBy,
       createdAt:new Date().toISOString(),
       items
     });
@@ -1996,21 +2128,69 @@ async function saveAssetMonitoring(){
   closeAssetMonitoringView();
   alert(`Monitoring kondisi asset berhasil ${wasEdit?'diperbarui':'disimpan'}.`);
 }
-function getMonitoringReportRows(report){
+function normalizeMonitoringLocationFilterId(rawValue){
+  if(rawValue===null||typeof rawValue==='undefined'||rawValue==='')return null;
+  const locId=Number(rawValue);
+  return Number.isFinite(locId)?locId:null;
+}
+function normalizeMonitoringGroupBy(rawValue){
+  return String(rawValue||'location')==='none'?'none':'location';
+}
+function getMonitoringReportViewOptions(report,overrides={}){
+  return{
+    locationFilterId:Object.prototype.hasOwnProperty.call(overrides,'locationFilterId')
+      ?normalizeMonitoringLocationFilterId(overrides.locationFilterId)
+      :normalizeMonitoringLocationFilterId(report&&report.locationFilterId),
+    groupBy:Object.prototype.hasOwnProperty.call(overrides,'groupBy')
+      ?normalizeMonitoringGroupBy(overrides.groupBy)
+      :normalizeMonitoringGroupBy(report&&report.groupBy)
+  };
+}
+function getMonitoringRowLocationId(item,asset){
+  if(item&&item.lokasiId!==null&&typeof item.lokasiId!=='undefined'&&item.lokasiId!==''&&Number.isFinite(Number(item.lokasiId)))return Number(item.lokasiId);
+  if(asset&&Number.isFinite(Number(asset.locId)))return Number(asset.locId);
+  return null;
+}
+function getMonitoringReportRows(report,options={}){
   if(!report)return [];
-  return (report.items||[]).map((item,idx)=>{
+  const viewOptions=getMonitoringReportViewOptions(report,options);
+  const rows=(report.items||[]).map(item=>{
     const asset=(DB.assets||[]).find(asset=>asset.id==item.assetId)||null;
+    const lokasiId=getMonitoringRowLocationId(item,asset);
+    const lokasi=item.lokasi||(lokasiId!==null?getLocName(lokasiId):'-');
     return{
-      no:idx+1,
       kode:String(item.kodeAsset||'-').replace(/^AST-/,''),
       nama:item.nama||'-',
       kategori:asset?getTypeName(asset.typeId):'-',
-      lokasi:item.lokasi||'-',
+      lokasiId,
+      lokasi,
       jumlah:`${fmtNum(item.jumlah||1)} ${item.satuan||'Unit'}`,
+      jumlahValue:Number(item.jumlah)||1,
       kondisi:item.kondisi||'Baik',
       keterangan:item.keterangan||'-'
     };
+  }).filter(row=>viewOptions.locationFilterId===null||(row.lokasiId!==null&&assetMatchesLocationFilter(row.lokasiId,viewOptions.locationFilterId)));
+  return rows
+    .sort((a,b)=>String(a.lokasi||'').localeCompare(String(b.lokasi||''))||String(a.nama||'').localeCompare(String(b.nama||''))||String(a.kode||'').localeCompare(String(b.kode||'')))
+    .map((row,idx)=>({...row,no:idx+1}));
+}
+function getMonitoringReportGroups(rows,groupBy){
+  const normalizedGroupBy=normalizeMonitoringGroupBy(groupBy);
+  if(normalizedGroupBy!=='location'){
+    return rows.length?[{label:'Semua Lokasi',rows}]:[];
+  }
+  const grouped=new Map();
+  rows.forEach(row=>{
+    const key=row.lokasiId!==null?String(row.lokasiId):`name:${row.lokasi}`;
+    if(!grouped.has(key))grouped.set(key,{label:row.lokasi||'Tanpa Lokasi',rows:[]});
+    grouped.get(key).rows.push(row);
   });
+  const orderedIds=getOrderedLocationIdsForRows(rows.map(row=>({locId:row.lokasiId})));
+  const groups=orderedIds.filter(id=>grouped.has(String(id))).map(id=>grouped.get(String(id)));
+  Array.from(grouped.entries()).forEach(([key,group])=>{
+    if(!orderedIds.includes(String(key)))groups.push(group);
+  });
+  return groups;
 }
 function getMonitoringReportSummary(report){
   const totals={total:0,baik:0,ringan:0,berat:0};
@@ -2029,13 +2209,28 @@ function getSelectedMonitoringReport(){
   const selectedId=selectedMonitoringReportId!==null?String(selectedMonitoringReportId):'';
   return reports.find(item=>String(item.id)===selectedId)||reports[0];
 }
-function buildMonitoringReportDocument(report){
+function syncMonitoringReportControlState(report,force=false){
+  populateLocationSelect('monitoring-report-location-filter');
+  const locFilterEl=document.getElementById('monitoring-report-location-filter');
+  const groupByEl=document.getElementById('monitoring-report-group-by');
+  if(force){
+    selectedMonitoringReportLocationFilter=report&&report.locationFilterId!==null&&typeof report.locationFilterId!=='undefined'?String(report.locationFilterId):'';
+    selectedMonitoringReportGroupBy=report&&report.groupBy?String(report.groupBy):'location';
+  }
+  if(locFilterEl)locFilterEl.value=selectedMonitoringReportLocationFilter;
+  if(groupByEl)groupByEl.value=selectedMonitoringReportGroupBy;
+}
+function buildMonitoringReportDocument(report,options={}){
   if(!report){
     return `<div class="empty-state"><div class="icon">📭</div><p>Belum ada data monitoring yang tersimpan.</p></div>`;
   }
-  const summary=getMonitoringReportSummary(report);
-  const rows=getMonitoringReportRows(report);
-  const metaLocationCount=new Set((report.items||[]).map(item=>item.lokasi||'-')).size;
+  const viewOptions=getMonitoringReportViewOptions(report,options);
+  const rows=getMonitoringReportRows(report,viewOptions);
+  const groups=getMonitoringReportGroups(rows,viewOptions.groupBy);
+  const summary=getMonitoringReportSummary({items:rows.map(row=>({jumlah:row.jumlahValue,kondisi:row.kondisi}))});
+  const metaLocationCount=new Set(rows.map(item=>item.lokasi||'-')).size;
+  const filterLabel=viewOptions.locationFilterId!==null?getLocationOptionLabel(getLocationById(viewOptions.locationFilterId)):'Semua Lokasi';
+  const groupLabel=viewOptions.groupBy==='location'?'Lokasi':'Tanpa Grouping';
   const assetReportSignatories=getAssetReportSignatories();
   return `<div class="report-sheet">
     <div class="report-sheet-title">Laporan Hasil Monitoring Kondisi Fisik Barang Milik Daerah</div>
@@ -2045,6 +2240,8 @@ function buildMonitoringReportDocument(report){
       <tr><td style="width:180px"><b>Periode</b></td><td style="width:12px">:</td><td>${esc(report.periode||'-')}</td></tr>
       <tr><td><b>Tahun</b></td><td>:</td><td>${esc(report.tahun||'-')}</td></tr>
       <tr><td><b>Tanggal Pengecekan</b></td><td>:</td><td>${esc(report.tanggalPengecekan||'-')}</td></tr>
+      <tr><td><b>Filter Lokasi</b></td><td>:</td><td>${esc(filterLabel)}</td></tr>
+      <tr><td><b>Group By</b></td><td>:</td><td>${esc(groupLabel)}</td></tr>
       <tr><td><b>Jumlah Lokasi</b></td><td>:</td><td>${fmtNum(metaLocationCount)} lokasi</td></tr>
     </table>
     <div class="report-section-label">A. Ringkasan Kondisi Barang</div>
@@ -2079,6 +2276,7 @@ function buildMonitoringReportDocument(report){
       </div>
     </div>
     <div class="report-section-label">B. Daftar Hasil Pengecekan Kondisi Fisik Barang</div>
+    <div class="report-filter-note">Data pada tabel mengikuti filter lokasi dan pengelompokan yang sama dengan tampilan cetak.</div>
     <table class="report-preview-table">
       <thead>
         <tr>
@@ -2092,7 +2290,10 @@ function buildMonitoringReportDocument(report){
           <th style="width:180px">Keterangan</th>
         </tr>
       </thead>
-      <tbody>${rows.length?rows.map(row=>`<tr>
+      <tbody>${rows.length?groups.map(group=>{
+        const totalUnits=group.rows.reduce((sum,row)=>sum+(row.jumlahValue||0),0);
+        const header=viewOptions.groupBy==='location'?`<tr class="report-group-row"><td colspan="8">Lokasi: ${esc(group.label)} • ${fmtNum(group.rows.length)} aset • ${fmtNum(totalUnits)} unit</td></tr>`:'';
+        return `${header}${group.rows.map(row=>`<tr>
         <td style="text-align:center">${row.no}</td>
         <td style="text-align:center">${esc(row.kode)}</td>
         <td>${esc(row.nama)}</td>
@@ -2101,7 +2302,8 @@ function buildMonitoringReportDocument(report){
         <td style="text-align:center">${esc(row.jumlah)}</td>
         <td class="${getMonitoringConditionCellClass(row.kondisi)}">${esc(row.kondisi)}</td>
         <td>${esc(row.keterangan||'-')}</td>
-      </tr>`).join(''):'<tr><td colspan="8" style="text-align:center">Belum ada data hasil monitoring</td></tr>'}</tbody>
+      </tr>`).join('')}`;
+      }).join(''):'<tr><td colspan="8" style="text-align:center">Belum ada data hasil monitoring</td></tr>'}</tbody>
     </table>
     <div class="report-signature-date">Sleman, ${esc(fmtTanggalLaporan())}</div>
     <table class="report-signature-table">
@@ -2126,8 +2328,21 @@ function renderMonitoringReport(){
   const report=getSelectedMonitoringReport();
   const preview=document.getElementById('monitoring-report-preview');
   const countInfo=document.getElementById('monitoring-report-count-info');
+  const locFilterEl=document.getElementById('monitoring-report-location-filter');
+  const groupByEl=document.getElementById('monitoring-report-group-by');
+  if(locFilterEl)selectedMonitoringReportLocationFilter=locFilterEl.value||'';
+  if(groupByEl)selectedMonitoringReportGroupBy=groupByEl.value||'location';
   if(countInfo)countInfo.textContent=`${fmtNum((DB.assetConditionMonitorings||[]).length)} laporan tersedia`;
-  if(preview)preview.innerHTML=buildMonitoringReportDocument(report);
+  if(preview)preview.innerHTML=buildMonitoringReportDocument(report,{
+    locationFilterId:selectedMonitoringReportLocationFilter,
+    groupBy:selectedMonitoringReportGroupBy
+  });
+}
+function handleMonitoringReportSelectionChange(){
+  const selectEl=document.getElementById('monitoring-report-select');
+  selectedMonitoringReportId=selectEl?selectEl.value||null:null;
+  syncMonitoringReportControlState(getSelectedMonitoringReport(),true);
+  renderMonitoringReport();
 }
 function renderMonitoringReportPage(){
   const selectEl=document.getElementById('monitoring-report-select');
@@ -2139,6 +2354,7 @@ function renderMonitoringReportPage(){
       ?reports.map(report=>`<option value="${report.id}" ${String(selectedMonitoringReportId)===String(report.id)?'selected':''}>${esc(report.kodeLaporan||'-')} - ${esc(report.periode||'-')} ${esc(report.tahun||'-')}</option>`).join('')
       :'<option value="">Belum ada laporan monitoring</option>';
   }
+  syncMonitoringReportControlState(getSelectedMonitoringReport(),true);
   renderMonitoringReport();
 }
 
@@ -2894,12 +3110,13 @@ function printAssetStickers(){
     .content-table tr:last-child td{border-bottom:none}
     .content-table td:first-child{border-left:none}
     .content-table td:last-child{border-right:none}
+    .code-combined{font-size:13px;font-weight:700;line-height:1.2;text-align:center;background:#eee;font-family:monospace;letter-spacing:0.5px}
     .code-room{font-size:12px;font-weight:700;line-height:1.3}
     .asset-name{font-size:11px;font-weight:700;line-height:1.35}
     .asset-note{font-size:11px;line-height:1.35}
     .asset-note.empty{color:#555}
     .actions{margin-top:16px}
-    @media print{button{display:none}}
+    @media print{button{display:none}; .code-combined{background:#eee!important;-webkit-print-color-adjust: exact;print-color-adjust: exact;}}
   </style></head><body>
   <div class="sheet">
     ${rows.map(x=>{
@@ -2907,10 +3124,18 @@ function printAssetStickers(){
         const txt=String(value||'').trim();
         return txt&&txt!=='-'?txt:'';
       };
-      const locName=cleanStickerValue(getLocName(x.locId))||'-';
+      
+      const locObj = DB.locations.find(l=>l.id==x.locId);
+      const locCode = locObj && locObj.code ? String(locObj.code).trim() : '-';
+      const locName=cleanStickerValue(locObj ? locObj.name : '-')||'-';
+      const assetCode = cleanStickerValue(x.code) || '-';
+      
+      const codeCombination = `${locCode} / ${assetCode}`;
+      
       const serialText=cleanStickerValue(x.serial);
       const merkText=cleanStickerValue(x.merk);
       const assetName=cleanStickerValue(x.name)||'-';
+      
       const topLine=serialText?`${locName} - ${serialText}`:locName;
       const secondLine=merkText?`${assetName} - ${merkText}`:assetName;
       return `<table class="sticker">
@@ -2923,6 +3148,7 @@ function printAssetStickers(){
         </td>
         <td class="content-cell">
           <table class="content-table">
+            <tr><td class="code-combined">${esc(codeCombination)}</td></tr>
             <tr><td class="code-room">${esc(topLine||'-')}</td></tr>
             <tr><td class="asset-name">${esc(secondLine||x.name||'-')}</td></tr>
             <tr><td class="asset-note ${!(x.notes||'').trim()?'empty':''}">${esc((x.notes||'').trim()||'-')}</td></tr>
@@ -3150,7 +3376,10 @@ function exportLoanReportExcel(){
 
 function buildMonitoringReportPrintHtml(){
   const report=getSelectedMonitoringReport();
-  const content=buildMonitoringReportDocument(report);
+  const content=buildMonitoringReportDocument(report,{
+    locationFilterId:selectedMonitoringReportLocationFilter,
+    groupBy:selectedMonitoringReportGroupBy
+  });
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Laporan Monitoring Kondisi Fisik</title><style>
     @page{size:A4 portrait;margin:10mm}
     body{font-family:Arial,sans-serif;padding:18px;color:#111;font-size:11px;background:#fff}
@@ -3173,9 +3402,11 @@ function buildMonitoringReportPrintHtml(){
     .report-preview-table{width:100%;border-collapse:collapse;font-size:11px}
     .report-preview-table th,.report-preview-table td{border:1px solid #bcc7da;padding:7px 7px;vertical-align:top}
     .report-preview-table th{background:#233f67;color:#fff;text-align:center}
+    .report-group-row td{background:#e8eef6;font-weight:700;border-top:2px solid #bcc7da}
     .report-kondisi-good{background:#e7f0d9;color:#2f6d1f;font-weight:700;text-align:center}
     .report-kondisi-light{background:#f8ecd3;color:#9a6200;font-weight:700;text-align:center}
     .report-kondisi-heavy{background:#f6e1e1;color:#a12b2b;font-weight:700;text-align:center}
+    .report-filter-note{font-size:11px;color:#333;margin-bottom:12px}
     .report-signature-date{text-align:right;font-size:12px;margin-top:18px;margin-bottom:6px}
     .report-signature-table{width:100%;border-collapse:collapse;margin-top:8px}
     .report-signature-table td{width:50%;text-align:center;padding:4px 6px;vertical-align:top;border:none}
