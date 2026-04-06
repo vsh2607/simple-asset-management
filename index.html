@@ -601,7 +601,10 @@
           <div class="page-title">Laporan Daftar Asset</div>
           <div class="page-sub">Jumlah daftar barang milik daerah yang dipinjamkan kepada BNNK Sleman yang telah dilengkapi data administrasi secara rinci</div>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <select id="loan-report-filter-loc" onchange="renderLoanReport()" style="padding:7px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;min-width:200px">
+            <option value="">Semua Lokasi</option>
+          </select>
           <button class="btn btn-outline" onclick="printLoanReport()">🖨️ Cetak / PDF</button>
           <button class="btn btn-success" onclick="exportLoanReportExcel()">📊 Ekspor Excel</button>
         </div>
@@ -625,7 +628,7 @@
     <div id="page-monitoring-report" class="page" style="display:none">
       <div class="topbar">
         <div>
-          <div class="page-title">Laporan Monitoring Kondisi Fisik</div>
+          <div class="page-title">Laporan Hasil Monitoring Kondisi Fisik Barang Milik Daerah Yang Dipinjamkan Kepada BNNK Sleman</div>
           <div class="page-sub">Laporan hasil monitoring kondisi fisik barang milik daerah yang dipinjamkan kepada BNNK Sleman.</div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -1236,7 +1239,7 @@ function showPage(pg){
   if(pg==='sources')renderSources();
   if(pg==='assets'){populateFilters();renderAssets();}
   if(pg==='asset-monitoring')renderAssetMonitoringPage();
-  if(pg==='loan-report')renderLoanReport();
+  if(pg==='loan-report'){populateLocationSelect('loan-report-filter-loc');renderLoanReport();}
   if(pg==='monitoring-report')renderMonitoringReportPage();
   if(pg==='documents')renderDocuments();
   if(pg==='variables')renderVariables();
@@ -2233,8 +2236,7 @@ function buildMonitoringReportDocument(report,options={}){
   const groupLabel=viewOptions.groupBy==='location'?'Lokasi':'Tanpa Grouping';
   const assetReportSignatories=getAssetReportSignatories();
   return `<div class="report-sheet">
-    <div class="report-sheet-title">Laporan Hasil Monitoring Kondisi Fisik Barang Milik Daerah</div>
-    <div class="report-sheet-title">Yang Dipinjamkan Kepada BNNK Sleman</div>
+    <div class="report-sheet-title">LAPORAN HASIL MONITORING KONDISI FISIK BARANG MILIK DAERAH YANG DIPINJAMKAN KEPADA BNNK SLEMAN</div>
     <div class="report-sheet-subtitle">Kode Laporan: ${esc(report.kodeLaporan||'-')}</div>
     <table class="report-meta">
       <tr><td style="width:180px"><b>Periode</b></td><td style="width:12px">:</td><td>${esc(report.periode||'-')}</td></tr>
@@ -2848,7 +2850,10 @@ function getAssetYear(x){
   return year?year[1]:'-';
 }
 function getLoanReportRows(){
-  return (DB.assets||[]).map((asset,idx)=>({
+  const filterLocId = (document.getElementById('loan-report-filter-loc')||{value:''}).value;
+  return (DB.assets||[])
+    .filter(asset => assetMatchesLocationFilter(asset.locId, filterLocId))
+    .map((asset,idx)=>({
     no:idx+1,
     code:asset.code||'-',
     name:asset.name||'-',
@@ -2859,8 +2864,11 @@ function getLoanReportRows(){
   }));
 }
 function getLoanReportSummaryRows(){
+  const filterLocId = (document.getElementById('loan-report-filter-loc')||{value:''}).value;
   const grouped=new Map();
-  (DB.assets||[]).forEach(asset=>{
+  (DB.assets||[])
+    .filter(asset => assetMatchesLocationFilter(asset.locId, filterLocId))
+    .forEach(asset=>{
     const lokasi=getLocName(asset.locId);
     const kategori=getTypeName(asset.typeId);
     if(!grouped.has(lokasi))grouped.set(lokasi,{lokasi,total:0,perKategori:new Map()});
@@ -3253,7 +3261,7 @@ function printLoanReport(){
     const start=pageIdx*maxRowsPerPage;
     const pageRows=rows.slice(start,start+maxRowsPerPage);
     return `<div class="print-page">
-      ${buildHeader(pageIdx+1,'LAPORAN DAFTAR ASSET BMD','BNNK SLEMAN')}
+      ${buildHeader(pageIdx+1,'DAFTAR BARANG MILIK DAERAH YANG DIPINJAMKAN KEPADA BNNK SLEMAN','')}
       <table class="tbl">
         <thead><tr><th class="col-no">No</th><th>Kode Barang</th><th>Nama Barang</th><th>Tahun Perolehan</th><th>Kondisi</th><th>Lokasi Penempatan</th><th>Kategori</th></tr></thead>
         <tbody>${pageRows.length?pageRows.map((row,i)=>`<tr>
@@ -3292,7 +3300,7 @@ function printLoanReport(){
       </table>`:''}
     </div>`;
   });
-  const html=`<!DOCTYPE html><html><head><title>LAPORAN DAFTAR ASSET BMD</title><style>
+  const html=`<!DOCTYPE html><html><head><title>DAFTAR BARANG MILIK DAERAH YANG DIPINJAMKAN KEPADA BNNK SLEMAN</title><style>
     @page{size:A4 portrait;margin:10mm}
     body{font-family:Arial,sans-serif;padding:24px 30px;color:#111;font-size:11px}
     .meta{width:100%;font-size:12px;line-height:1.45}
@@ -3338,8 +3346,8 @@ function exportLoanReportExcel(){
       <tr><td>NAMA UPB</td><td>: BNN KABUPATEN SLEMAN</td><td class="right">Tgl Cetak : ${cetakDate}</td></tr>
       <tr><td>KODE UPB</td><td>:</td><td class="right">Halaman 1</td></tr>
     </table>
-    <div class="title">LAPORAN DAFTAR ASSET</div>
-    <div class="subtitle">BNNK SLEMAN</div>
+    <div class="title">DAFTAR BARANG MILIK DAERAH YANG DIPINJAMKAN KEPADA BNNK SLEMAN</div>
+    <div class="subtitle"></div>
     <table class="tbl">
       <thead><tr><th class="no">No</th><th>Kode Barang</th><th>Nama Barang</th><th>Tahun Perolehan</th><th>Kondisi</th><th>Lokasi Penempatan</th><th>Kategori</th></tr></thead>
       <tbody>${rows.length?rows.map((row,i)=>`<tr>
@@ -3380,7 +3388,7 @@ function buildMonitoringReportPrintHtml(){
     locationFilterId:selectedMonitoringReportLocationFilter,
     groupBy:selectedMonitoringReportGroupBy
   });
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Laporan Monitoring Kondisi Fisik</title><style>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>LAPORAN HASIL MONITORING KONDISI FISIK BARANG MILIK DAERAH YANG DIPINJAMKAN KEPADA BNNK SLEMAN</title><style>
     @page{size:A4 portrait;margin:10mm}
     body{font-family:Arial,sans-serif;padding:18px;color:#111;font-size:11px;background:#fff}
     .report-sheet{padding:0}
@@ -3437,7 +3445,7 @@ function exportMonitoringReportExcel(){
   const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=`LAPORAN_MONITORING_KONDISI_FISIK_${String(report.tanggalPengecekan||todayISO())}.xls`;
+  a.download=`LAPORAN_HASIL_MONITORING_KONDISI_FISIK_BARANG_MILIK_DAERAH_YANG_DIPINJAMKAN_KEPADA_BNNK_SLEMAN_${String(report.tanggalPengecekan||todayISO())}.xls`;
   a.click();
 }
 
